@@ -491,7 +491,7 @@ LTVGP_control_trace_offlineCovar = open("./trace_data/autocar_control_trace_LTVG
 nom_state_trace = open("./trace_data/autocar_state_trace_nom.txt", "r")
 nom_control_trace = open("./trace_data/autocar_control_trace_nom.txt", "r")
 
-plotAllSol(N, True, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace, LTVGP_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace)
+plotAllSol(N, False, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace, LTVGP_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace)
 
 avgRhoSmooth = avgRobustness(smoothOp_state_trace, smoothOp_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 avgRhoLTV = avgRobustness(LTVGP_state_trace, LTVGP_control_trace_offlineCovar, goal_x, goal_y, obstacle_x, obstacle_y)
