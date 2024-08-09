@@ -1,7 +1,5 @@
 import numpy as np
-from scipy.stats import norm
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 from casadi import *
 
 import cstr_model as cstr

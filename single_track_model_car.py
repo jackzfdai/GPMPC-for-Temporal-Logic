@@ -1,6 +1,5 @@
 import numpy as np
 from casadi import *
-import torch
 
 import gp_dynamics as gpdyn
 
