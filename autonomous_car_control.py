@@ -562,6 +562,7 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
     xcovar_init = [1e-9]*(stateLen**2)
 
     smallEpsilon = 1e-6
+    smallRho = 0.25
 
     sxRobustness = 0
     syRobustness = 0
@@ -623,9 +624,9 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
 
     # STL constraints
     # avoid
-    g += [obstacle_polygon_x[0] - X0[0] + sxRobustness + bigMx*(1 - Zavoid_0[0])] 
-    g += [X0[0] - obstacle_polygon_x[1] + sxRobustness + bigMx*(1 - Zavoid_0[1])] 
-    g += [X0[1] - obstacle_polygon_y[1] + syRobustness + bigMy*(1 - Zavoid_0[2])] 
+    g += [obstacle_polygon_x[0] - X0[0] - smallRho + sxRobustness + bigMx*(1 - Zavoid_0[0])] 
+    g += [X0[0] - obstacle_polygon_x[1] - smallRho + sxRobustness + bigMx*(1 - Zavoid_0[1])] 
+    g += [X0[1] - obstacle_polygon_y[1] - smallRho + syRobustness + bigMy*(1 - Zavoid_0[2])] 
     
     g += [Zavoid_0[0] + Zavoid_0[1] + Zavoid_0[2]]
 
@@ -655,8 +656,6 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
     # Formulate the NLP
     Xk = X0
 
-    if N == 23:
-        print('debug')
     for k in range(N):
         # New NLP variable for the control
         Uk = MX.sym('U_' + str(k), controlLen)
@@ -712,9 +711,9 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
 
         # STL constraints
         # avoid
-        g += [obstacle_polygon_x[0] - Xk[0] + sxRobustness + bigMx*(1 - Zavoid_k[0])] 
-        g += [Xk[0] - obstacle_polygon_x[1] + sxRobustness + bigMx*(1 - Zavoid_k[1])] 
-        g += [Xk[1] - obstacle_polygon_y[1] + syRobustness + bigMy*(1 - Zavoid_k[2])] 
+        g += [obstacle_polygon_x[0] - Xk[0] - smallRho + sxRobustness + bigMx*(1 - Zavoid_k[0])] 
+        g += [Xk[0] - obstacle_polygon_x[1] - smallRho + sxRobustness + bigMx*(1 - Zavoid_k[1])] 
+        g += [Xk[1] - obstacle_polygon_y[1] - smallRho + syRobustness + bigMy*(1 - Zavoid_k[2])] 
     
         g += [Zavoid_k[0] + Zavoid_k[1] + Zavoid_k[2]]
     
@@ -841,6 +840,7 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
     uncertaintyLookaheadN = 50
     uncertaintyLookaheadN2 = 20
     smallEpsilon = 1e-5
+    smallRho = 0.25
 
     M = 4 # RK4 steps per interval
     DT = T/N/M
@@ -907,13 +907,13 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
     # STL constraints
     # avoid
     if onlineCovar == True:
-        g += [obstacle_polygon_x[0] - X0[0] + invCDFVarphiEpsilon * sqrt(XCOVAR0[0] + smallEpsilon) + bigMx*(1 - Zavoid_0[0])] 
-        g += [X0[0] - obstacle_polygon_x[1] + invCDFVarphiEpsilon * sqrt(XCOVAR0[0] + smallEpsilon) + bigMx*(1 - Zavoid_0[1])] 
-        g += [X0[1] - obstacle_polygon_y[1] + invCDFVarphiEpsilon * sqrt(XCOVAR0[6] + smallEpsilon) + bigMy*(1 - Zavoid_0[2])]
+        g += [obstacle_polygon_x[0] - X0[0] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVAR0[0] + smallEpsilon) + bigMx*(1 - Zavoid_0[0])] 
+        g += [X0[0] - obstacle_polygon_x[1] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVAR0[0] + smallEpsilon) + bigMx*(1 - Zavoid_0[1])] 
+        g += [X0[1] - obstacle_polygon_y[1] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVAR0[6] + smallEpsilon) + bigMy*(1 - Zavoid_0[2])]
     else:
-        g += [obstacle_polygon_x[0] - X0[0] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 0]) + bigMx*(1 - Zavoid_0[0])] 
-        g += [X0[0] - obstacle_polygon_x[1] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 0]) + bigMx*(1 - Zavoid_0[1])] 
-        g += [X0[1] - obstacle_polygon_y[1] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 6]) + bigMy*(1 - Zavoid_0[2])] 
+        g += [obstacle_polygon_x[0] - X0[0] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 0]) + bigMx*(1 - Zavoid_0[0])] 
+        g += [X0[0] - obstacle_polygon_x[1] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 0]) + bigMx*(1 - Zavoid_0[1])] 
+        g += [X0[1] - obstacle_polygon_y[1] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 6]) + bigMy*(1 - Zavoid_0[2])] 
     
     g += [Zavoid_0[0] + Zavoid_0[1] + Zavoid_0[2]]
 
@@ -1046,13 +1046,13 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
         # STL constraints
         # avoid
         if onlineCovar == True:
-            g += [obstacle_polygon_x[0] - Xk[0] + invCDFVarphiEpsilon * sqrt(XCOVARk[0] + smallEpsilon) + bigMx*(1 - Zavoid_k[0])] 
-            g += [Xk[0] - obstacle_polygon_x[1] + invCDFVarphiEpsilon * sqrt(XCOVARk[0] + smallEpsilon) + bigMx*(1 - Zavoid_k[1])] 
-            g += [Xk[1] - obstacle_polygon_y[1] + invCDFVarphiEpsilon * sqrt(XCOVARk[6] + smallEpsilon) + bigMy*(1 - Zavoid_k[2])]
+            g += [obstacle_polygon_x[0] - Xk[0] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVARk[0] + smallEpsilon) + bigMx*(1 - Zavoid_k[0])] 
+            g += [Xk[0] - obstacle_polygon_x[1] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVARk[0] + smallEpsilon) + bigMx*(1 - Zavoid_k[1])] 
+            g += [Xk[1] - obstacle_polygon_y[1] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVARk[6] + smallEpsilon) + bigMy*(1 - Zavoid_k[2])]
         else:
-            g += [obstacle_polygon_x[0] - Xk[0] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 0]) + bigMx*(1 - Zavoid_k[0])] 
-            g += [Xk[0] - obstacle_polygon_x[1] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 0]) + bigMx*(1 - Zavoid_k[1])] 
-            g += [Xk[1] - obstacle_polygon_y[1] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 6]) + bigMy*(1 - Zavoid_k[2])] 
+            g += [obstacle_polygon_x[0] - Xk[0] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 0]) + bigMx*(1 - Zavoid_k[0])] 
+            g += [Xk[0] - obstacle_polygon_x[1] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 0]) + bigMx*(1 - Zavoid_k[1])] 
+            g += [Xk[1] - obstacle_polygon_y[1] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 6]) + bigMy*(1 - Zavoid_k[2])] 
         
         g += [Zavoid_k[0] + Zavoid_k[1] + Zavoid_k[2]]
     
