@@ -160,48 +160,58 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
     GP_plotIdx = 2
     fig, ax = plt.subplots(3, 3, constrained_layout=True)
 
+    nom_color = 'xkcd:amethyst'
+    smoothOp_color = 'xkcd:windows blue'
+    lri_color = 'xkcd:orangish'
+
+    controller_label_x = 0
+    controller_label_y = 0.2
+
     ax[0, smoothOp_plotIdx].set_xlim(0, T)
     ax[0, smoothOp_plotIdx].set_ylim(0, 0.2)
     ax[0, 0].set_ylabel('x1')
     for traj in x_smoothOp: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]
-        ax[0, smoothOp_plotIdx].plot(tgrid_i, traj[:, 0], alpha=0.5, linestyle='-', linewidth=1, color='xkcd:windows blue')
+        ax[0, smoothOp_plotIdx].plot(tgrid_i, traj[:, 0], alpha=0.5, linestyle='-', linewidth=1, color=smoothOp_color)
     ax[0, smoothOp_plotIdx].grid(True, which='both')
+    ax[0, smoothOp_plotIdx].text(controller_label_x, controller_label_y, 'Smooth Robust', horizontalalignment='left', verticalalignment='bottom', fontsize="x-large")
 
     ax[0, GP_plotIdx].set_xlim(0, T)
     ax[0, GP_plotIdx].set_ylim(0, 0.2)
     for traj in x_GP: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]
-        ax[0, GP_plotIdx].plot(tgrid_i, traj[:, 0], alpha=0.5, linestyle='-', linewidth=1, color='xkcd:orangish')
+        ax[0, GP_plotIdx].plot(tgrid_i, traj[:, 0], alpha=0.5, linestyle='-', linewidth=1, color=lri_color)
     ax[0, GP_plotIdx].grid(True)
+    ax[0, GP_plotIdx].text(controller_label_x, controller_label_y, 'LRi', horizontalalignment='left', verticalalignment='bottom', fontsize="x-large")
 
     ax[0, nom_plotIdx].set_xlim(0, T)
     ax[0, nom_plotIdx].set_ylim(0, 0.2)
     for traj in x_Nom: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]
-        ax[0, nom_plotIdx].plot(tgrid_i, traj[:, 0], alpha=0.5, linestyle='-', linewidth=1, color='xkcd:windows blue')
+        ax[0, nom_plotIdx].plot(tgrid_i, traj[:, 0], alpha=0.5, linestyle='-', linewidth=1, color=nom_color)
     ax[0, nom_plotIdx].grid(True)
+    ax[0, nom_plotIdx].text(controller_label_x, controller_label_y, 'Nominal', horizontalalignment='left', verticalalignment='bottom', fontsize="x-large")
 
     ax[1, smoothOp_plotIdx].set_xlim(0, T)
     ax[1, smoothOp_plotIdx].set_ylim(0, 1.2)
     ax[1, 0].set_ylabel('x2')
     for traj in x_smoothOp: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]
-        ax[1, smoothOp_plotIdx].plot(tgrid_i, traj[:, 1], alpha=0.5, linestyle='-', linewidth=1, color='xkcd:windows blue')
+        ax[1, smoothOp_plotIdx].plot(tgrid_i, traj[:, 1], alpha=0.5, linestyle='-', linewidth=1, color=smoothOp_color)
     ax[1, smoothOp_plotIdx].grid(True)
 
     ax[1, GP_plotIdx].set_xlim(0, T)
     ax[1, GP_plotIdx].set_ylim(0, 1.2)
     for traj in x_GP: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]
-        ax[1, GP_plotIdx].plot(tgrid_i, traj[:, 1], alpha=0.5, linestyle='-', linewidth=1, color='xkcd:orangish')
+        ax[1, GP_plotIdx].plot(tgrid_i, traj[:, 1], alpha=0.5, linestyle='-', linewidth=1, color=lri_color)
     ax[1, GP_plotIdx].grid(True)
 
     ax[1, nom_plotIdx].set_xlim(0, T)
     ax[1, nom_plotIdx].set_ylim(0, 1.2)
     for traj in x_Nom: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]
-        ax[1, nom_plotIdx].plot(tgrid_i, traj[:, 1], alpha=0.5, linestyle='-', linewidth=1, color='xkcd:windows blue')
+        ax[1, nom_plotIdx].plot(tgrid_i, traj[:, 1], alpha=0.5, linestyle='-', linewidth=1, color=nom_color)
     ax[1, nom_plotIdx].grid(True)
 
     ax[2, smoothOp_plotIdx].set_xlim(0, T)
@@ -210,7 +220,7 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
     ax[2, 0].set_xlabel('T (mins)')
     for traj in u_smoothOp: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]            
-        ax[2, smoothOp_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color='xkcd:windows blue')
+        ax[2, smoothOp_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color=smoothOp_color)
     ax[2, smoothOp_plotIdx].grid(True)
 
     ax[2, GP_plotIdx].set_xlim(0, T)
@@ -218,7 +228,7 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
     ax[2, 1].set_xlabel('T (mins)')
     for traj in u_GP:
         tgrid_i = [T/N*k for k in range(traj.shape[0])]            
-        ax[2, GP_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color='xkcd:orangish')
+        ax[2, GP_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color=lri_color)
     ax[2, GP_plotIdx].grid(True)
 
     ax[2, nom_plotIdx].set_xlim(0, T)
@@ -226,7 +236,7 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
     ax[2, 2].set_xlabel('T (mins)')
     for traj in u_Nom: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]            
-        ax[2, nom_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color='xkcd:windows blue')
+        ax[2, nom_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color=nom_color)
     ax[2, nom_plotIdx].grid(True)
 
 def checkSAT(N, stateTraj):
@@ -309,54 +319,32 @@ def avgControlEffort(N, stateTraceFile, controlTraceFile):
 
     return avgControlEffort
 
-satCountNom = satLoop(Nom_state_trace_file)
-satCountGP = satLoop(GP_state_trace_file)
-satCountSmoothOp = satLoop(smoothOp_state_trace_file)
-
-def predictionRMSE(stateTraceFile, controlTraceFile, statePredictionFile):
-    initialStates = getInitialStates(stateTraceFile)
-    rmse = [-1]*2
-
-    predictionErrors = [np.array([0]*2)]
-    numDataPoints = 0
-    for initialState in initialStates:
-        stateTraces, controlTraces, predictionTraces = getTracesFor(initialState[0], initialState[1], stateTraceFile, controlTraceFile, predictionTraceFile=statePredictionFile)
-        assert(len(stateTraces) == len(controlTraces) == len(predictionTraces))
-        for i in range(len(stateTraces)):
-            stateTrace = stateTraces[i]
-            predictionTrace = predictionTraces[i]
-            predictionError = (stateTrace[1:, :] - predictionTrace[1:, :])**2
-            numDataPoints += predictionError.shape[0]
-            predictionError = np.sum(predictionError, axis=0)
-            predictionErrors += [predictionError]
-    
-    predictionErrors = np.vstack(predictionErrors)
-    predictionErrors = np.sum(predictionErrors, axis=0)
-    rmse = np.sqrt(predictionErrors/numDataPoints)
-    return rmse
-
 plotAllSol(N, smoothOp_state_trace_file, smoothOp_control_trace_file, GP_state_trace_file, GP_control_trace_file, Nom_state_trace_file, Nom_control_trace_file)
 
-satListSmoothOp = satList(smoothOp_state_trace_file, smoothOp_control_trace_file)
-satListGP = satList(GP_state_trace_file, GP_control_trace_file)
-satListNom = satList(Nom_state_trace_file, Nom_control_trace_file)
+# satCountNom = satLoop(Nom_state_trace_file)
+# satCountGP = satLoop(GP_state_trace_file)
+# satCountSmoothOp = satLoop(smoothOp_state_trace_file)
 
-avgControlEffortSmoothOp = avgControlEffort(N, smoothOp_state_trace_file, smoothOp_control_trace_file)
-avgControlEffortGP = avgControlEffort(N, GP_state_trace_file, GP_control_trace_file)
-avgControlEffortNom = avgControlEffort(N, Nom_state_trace_file, Nom_control_trace_file)
+# satListSmoothOp = satList(smoothOp_state_trace_file, smoothOp_control_trace_file)
+# satListGP = satList(GP_state_trace_file, GP_control_trace_file)
+# satListNom = satList(Nom_state_trace_file, Nom_control_trace_file)
 
-print("--STL sat--")
-print("Smooth Op: ", str(satCountSmoothOp))
-print("GP: ", str(satCountGP))
-print("Nom: ", str(satCountNom))
-print("---STL sat list---")
-print("Smooth Op: ", str(satListSmoothOp))
-print("GP: ", str(satListGP))
-print("Nom: ", str(satListNom))
-print("--Control effort--")
-print("Smooth Op: ", str(avgControlEffortSmoothOp))
-print("GP: ", str(avgControlEffortGP))
-print("Nom: ", str(avgControlEffortNom))
+# avgControlEffortSmoothOp = avgControlEffort(N, smoothOp_state_trace_file, smoothOp_control_trace_file)
+# avgControlEffortGP = avgControlEffort(N, GP_state_trace_file, GP_control_trace_file)
+# avgControlEffortNom = avgControlEffort(N, Nom_state_trace_file, Nom_control_trace_file)
+
+# print("--STL sat--")
+# print("Smooth Op: ", str(satCountSmoothOp))
+# print("GP: ", str(satCountGP))
+# print("Nom: ", str(satCountNom))
+# print("---STL sat list---")
+# print("Smooth Op: ", str(satListSmoothOp))
+# print("GP: ", str(satListGP))
+# print("Nom: ", str(satListNom))
+# print("--Control effort--")
+# print("Smooth Op: ", str(avgControlEffortSmoothOp))
+# print("GP: ", str(avgControlEffortGP))
+# print("Nom: ", str(avgControlEffortNom))
 
 smoothOp_state_trace_file.close()
 smoothOp_control_trace_file.close()

@@ -141,6 +141,13 @@ def plotSol(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = 
     
     fig, ax = plt.subplots(4, 1, constrained_layout=True)
 
+    controller_label_x = 99
+    controller_label_y = 4.5
+
+    nom_color = 'xkcd:amethyst'
+    smoothOp_color = 'xkcd:windows blue'
+    lri_color = 'xkcd:orangish'
+
     if len(goal_A_polygon_x) > 0:
         goal_A_polygon_x_plot = [goal_A_polygon_x[0], goal_A_polygon_x[0], goal_A_polygon_x[1], goal_A_polygon_x[1]]
         goal_A_polygon_y_plot = [goal_A_polygon_y[1], goal_A_polygon_y[0], goal_A_polygon_y[0], goal_A_polygon_y[1]] 
@@ -171,36 +178,40 @@ def plotSol(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = 
     ax[smoothOp_plotIdx].set_ylim(ylim[0], ylim[1])
     ax[smoothOp_plotIdx].set_xlabel('Sx (m)')
     ax[smoothOp_plotIdx].set_ylabel('Sy (m)')
+    ax[smoothOp_plotIdx].text(controller_label_x, controller_label_y, 'Smooth Robust', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
 
     for traj in x_smoothOp:
-        ax[smoothOp_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color="xkcd:windows blue")
+        ax[smoothOp_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=smoothOp_color)
     ax[smoothOp_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
 
     ax[GP_plotIdx].set_xlim(xlim[0], xlim[1])
     ax[GP_plotIdx].set_ylim(ylim[0], ylim[1])
     ax[GP_plotIdx].set_xlabel('Sx (m)')
     ax[GP_plotIdx].set_ylabel('Sy (m)')
+    ax[GP_plotIdx].text(controller_label_x, controller_label_y, 'LLRi', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
 
     for traj in x_GP:
-        ax[GP_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color="xkcd:orangish")
+        ax[GP_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=lri_color)
     ax[GP_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
 
     ax[GP_offlineCovar_plotIdx].set_xlim(xlim[0], xlim[1])
     ax[GP_offlineCovar_plotIdx].set_ylim(ylim[0], ylim[1])
     ax[GP_offlineCovar_plotIdx].set_xlabel('Sx (m)')
     ax[GP_offlineCovar_plotIdx].set_ylabel('Sy (m)')
+    ax[GP_offlineCovar_plotIdx].text(controller_label_x, controller_label_y, 'LLRi-PC', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
 
     for traj in x_GP_offlineCovar:
-        ax[GP_offlineCovar_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color="xkcd:orangish")
+        ax[GP_offlineCovar_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=lri_color)
     ax[GP_offlineCovar_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
 
     ax[nom_plotIdx].set_xlim(xlim[0], xlim[1])
     ax[nom_plotIdx].set_ylim(ylim[0], ylim[1])
     ax[nom_plotIdx].set_xlabel('Sx (m)')
     ax[nom_plotIdx].set_ylabel('Sy (m)')
+    ax[nom_plotIdx].text(controller_label_x, controller_label_y, 'Nominal', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
 
     for traj in x_Nom:
-        ax[nom_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color="xkcd:windows blue")
+        ax[nom_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=nom_color)
     ax[nom_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
 
     if plotControl:

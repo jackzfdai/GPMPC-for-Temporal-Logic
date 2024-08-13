@@ -562,7 +562,9 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
     xcovar_init = [1e-9]*(stateLen**2)
 
     smallEpsilon = 1e-6
-    smallRho = 0.25
+    smallRho = 0.25 #Since system is treated as discrete, even though discrete positions at 0,...,N might not be hitting obstacle, the 
+                    #plots interpolate these points and sometimes the interpolating lines look like they're going through the obstacle. 
+                    #Add small buffer around obstacle to remove this effect.
 
     sxRobustness = 0
     syRobustness = 0
@@ -840,7 +842,9 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
     uncertaintyLookaheadN = 50
     uncertaintyLookaheadN2 = 20
     smallEpsilon = 1e-5
-    smallRho = 0.25
+    smallRho = 0.25 #Since system is treated as discrete, even though discrete positions at 0,...,N might not be hitting obstacle, the 
+                    #plots interpolate these points and sometimes the interpolating lines look like they're going through the obstacle. 
+                    #Add small buffer around obstacle to remove this effect.
 
     M = 4 # RK4 steps per interval
     DT = T/N/M
