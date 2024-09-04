@@ -134,6 +134,8 @@ def getTracesFor(init_x, init_y, stateTraceFile, controlTraceFile):
     return targetStateTraces, targetControlTraces
 
 def plotSol(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_GP_offlineCovar = [], u_GP_offlineCovar = [], x_Nom = [], u_Nom = [], goal_A_polygon_x = [], goal_A_polygon_y = [], obstacle_polygon_x = [], obstacle_polygon_y = []):
+    params = {'mathtext.default': 'regular' }          
+    plt.rcParams.update(params)
     nom_plotIdx = 0
     smoothOp_plotIdx = 1
     GP_plotIdx = 2
@@ -176,8 +178,8 @@ def plotSol(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = 
 
     ax[smoothOp_plotIdx].set_xlim(xlim[0], xlim[1])
     ax[smoothOp_plotIdx].set_ylim(ylim[0], ylim[1])
-    ax[smoothOp_plotIdx].set_xlabel('Sx (m)')
-    ax[smoothOp_plotIdx].set_ylabel('Sy (m)')
+    ax[smoothOp_plotIdx].set_xlabel('$s_x\, (m)$')
+    ax[smoothOp_plotIdx].set_ylabel('$s_y\, (m)$')
     ax[smoothOp_plotIdx].text(controller_label_x, controller_label_y, 'Smooth Robust', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
 
     for traj in x_smoothOp:
@@ -186,8 +188,8 @@ def plotSol(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = 
 
     ax[GP_plotIdx].set_xlim(xlim[0], xlim[1])
     ax[GP_plotIdx].set_ylim(ylim[0], ylim[1])
-    ax[GP_plotIdx].set_xlabel('Sx (m)')
-    ax[GP_plotIdx].set_ylabel('Sy (m)')
+    ax[GP_plotIdx].set_xlabel('$s_x\, (m)$')
+    ax[GP_plotIdx].set_ylabel('$s_y\, (m)$')
     ax[GP_plotIdx].text(controller_label_x, controller_label_y, 'LLRi', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
 
     for traj in x_GP:
@@ -196,8 +198,8 @@ def plotSol(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = 
 
     ax[GP_offlineCovar_plotIdx].set_xlim(xlim[0], xlim[1])
     ax[GP_offlineCovar_plotIdx].set_ylim(ylim[0], ylim[1])
-    ax[GP_offlineCovar_plotIdx].set_xlabel('Sx (m)')
-    ax[GP_offlineCovar_plotIdx].set_ylabel('Sy (m)')
+    ax[GP_offlineCovar_plotIdx].set_xlabel('$s_x\, (m)$')
+    ax[GP_offlineCovar_plotIdx].set_ylabel('$s_y\, (m)$')
     ax[GP_offlineCovar_plotIdx].text(controller_label_x, controller_label_y, 'LLRi-PC', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
 
     for traj in x_GP_offlineCovar:
@@ -206,8 +208,8 @@ def plotSol(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = 
 
     ax[nom_plotIdx].set_xlim(xlim[0], xlim[1])
     ax[nom_plotIdx].set_ylim(ylim[0], ylim[1])
-    ax[nom_plotIdx].set_xlabel('Sx (m)')
-    ax[nom_plotIdx].set_ylabel('Sy (m)')
+    ax[nom_plotIdx].set_xlabel('$s_x\, (m)$')
+    ax[nom_plotIdx].set_ylabel('$s_y\, (m)$')
     ax[nom_plotIdx].text(controller_label_x, controller_label_y, 'Nominal', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
 
     for traj in x_Nom:

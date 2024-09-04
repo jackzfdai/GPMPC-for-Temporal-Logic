@@ -39,6 +39,7 @@ C_th = 0.1
 T_th = 0.5
 
 def satLoop(stateTraceFile):
+    stateTraceFile.seek(0)
     stateTrace = []
     satCount = 0
     for line in stateTraceFile:
@@ -155,6 +156,8 @@ def satList(stateTraceFile, controlTraceFile):
     return sat_count_list
 
 def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [], u_Nom = []):
+    params = {'mathtext.default': 'regular' }          
+    plt.rcParams.update(params)
     nom_plotIdx = 0
     smoothOp_plotIdx = 1
     GP_plotIdx = 2
@@ -167,9 +170,14 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
     controller_label_x = 0
     controller_label_y = 0.2
 
+    # ax[0, 1].set_yticklabels([])
+    # ax[0, 2].set_yticklabels([])
+    # ax[1, 1].set_yticklabels([])
+    # ax[1, 2].set_yticklabels([])
+
     ax[0, smoothOp_plotIdx].set_xlim(0, T)
     ax[0, smoothOp_plotIdx].set_ylim(0, 0.2)
-    ax[0, 0].set_ylabel('x1')
+    ax[0, 0].set_ylabel('$Composition, x_1$')
     for traj in x_smoothOp: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]
         ax[0, smoothOp_plotIdx].plot(tgrid_i, traj[:, 0], alpha=0.5, linestyle='-', linewidth=1, color=smoothOp_color)
@@ -194,7 +202,7 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
 
     ax[1, smoothOp_plotIdx].set_xlim(0, T)
     ax[1, smoothOp_plotIdx].set_ylim(0, 1.2)
-    ax[1, 0].set_ylabel('x2')
+    ax[1, 0].set_ylabel('$Temperature, x_2$')
     for traj in x_smoothOp: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]
         ax[1, smoothOp_plotIdx].plot(tgrid_i, traj[:, 1], alpha=0.5, linestyle='-', linewidth=1, color=smoothOp_color)
@@ -216,7 +224,7 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
 
     ax[2, smoothOp_plotIdx].set_xlim(0, T)
     ax[2, smoothOp_plotIdx].set_ylim(-1.2, 1.2)
-    ax[2, 0].set_ylabel('u')
+    ax[2, 0].set_ylabel('Cooling Input, u')
     ax[2, 0].set_xlabel('T (mins)')
     for traj in u_smoothOp: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]            
@@ -226,6 +234,7 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
     ax[2, GP_plotIdx].set_xlim(0, T)
     ax[2, GP_plotIdx].set_ylim(-1.2, 1.2)
     ax[2, 1].set_xlabel('T (mins)')
+    # ax[2, 1].set_yticklabels([])
     for traj in u_GP:
         tgrid_i = [T/N*k for k in range(traj.shape[0])]            
         ax[2, GP_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color=lri_color)
@@ -234,6 +243,7 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
     ax[2, nom_plotIdx].set_xlim(0, T)
     ax[2, nom_plotIdx].set_ylim(-1.2, 1.2)
     ax[2, 2].set_xlabel('T (mins)')
+    # ax[2, 2].set_yticklabels([])
     for traj in u_Nom: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]            
         ax[2, nom_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color=nom_color)
@@ -321,30 +331,30 @@ def avgControlEffort(N, stateTraceFile, controlTraceFile):
 
 plotAllSol(N, smoothOp_state_trace_file, smoothOp_control_trace_file, GP_state_trace_file, GP_control_trace_file, Nom_state_trace_file, Nom_control_trace_file)
 
-# satCountNom = satLoop(Nom_state_trace_file)
-# satCountGP = satLoop(GP_state_trace_file)
-# satCountSmoothOp = satLoop(smoothOp_state_trace_file)
+satCountNom = satLoop(Nom_state_trace_file)
+satCountGP = satLoop(GP_state_trace_file)
+satCountSmoothOp = satLoop(smoothOp_state_trace_file)
 
-# satListSmoothOp = satList(smoothOp_state_trace_file, smoothOp_control_trace_file)
-# satListGP = satList(GP_state_trace_file, GP_control_trace_file)
-# satListNom = satList(Nom_state_trace_file, Nom_control_trace_file)
+satListSmoothOp = satList(smoothOp_state_trace_file, smoothOp_control_trace_file)
+satListGP = satList(GP_state_trace_file, GP_control_trace_file)
+satListNom = satList(Nom_state_trace_file, Nom_control_trace_file)
 
-# avgControlEffortSmoothOp = avgControlEffort(N, smoothOp_state_trace_file, smoothOp_control_trace_file)
-# avgControlEffortGP = avgControlEffort(N, GP_state_trace_file, GP_control_trace_file)
-# avgControlEffortNom = avgControlEffort(N, Nom_state_trace_file, Nom_control_trace_file)
+avgControlEffortSmoothOp = avgControlEffort(N, smoothOp_state_trace_file, smoothOp_control_trace_file)
+avgControlEffortGP = avgControlEffort(N, GP_state_trace_file, GP_control_trace_file)
+avgControlEffortNom = avgControlEffort(N, Nom_state_trace_file, Nom_control_trace_file)
 
-# print("--STL sat--")
-# print("Smooth Op: ", str(satCountSmoothOp))
-# print("GP: ", str(satCountGP))
-# print("Nom: ", str(satCountNom))
-# print("---STL sat list---")
-# print("Smooth Op: ", str(satListSmoothOp))
-# print("GP: ", str(satListGP))
-# print("Nom: ", str(satListNom))
-# print("--Control effort--")
-# print("Smooth Op: ", str(avgControlEffortSmoothOp))
-# print("GP: ", str(avgControlEffortGP))
-# print("Nom: ", str(avgControlEffortNom))
+print("--STL sat--")
+print("Smooth Op: ", str(satCountSmoothOp))
+print("GP: ", str(satCountGP))
+print("Nom: ", str(satCountNom))
+print("---STL sat list---")
+print("Smooth Op: ", str(satListSmoothOp))
+print("GP: ", str(satListGP))
+print("Nom: ", str(satListNom))
+print("--Control effort--")
+print("Smooth Op: ", str(avgControlEffortSmoothOp))
+print("GP: ", str(avgControlEffortGP))
+print("Nom: ", str(avgControlEffortNom))
 
 smoothOp_state_trace_file.close()
 smoothOp_control_trace_file.close()
