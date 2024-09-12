@@ -20,7 +20,7 @@ cstr_paramBeta = 0.3
 
 x1_0 = 0
 x2_0 = 0.0
-xCovar0 = [1e-6]*4
+xCovar0 = [0]*4
 
 cstr_sys = cstr.cstrModel(cstr_paramD, cstr_paramB, cstr_paramGamma, cstr_paramBeta)
 cstr_sim_sys = cstr.cstrSimModel(cstr_paramD, cstr_paramB, cstr_paramGamma, cstr_paramBeta, x1_0, x2_0)
@@ -224,11 +224,12 @@ def solveMINLP(plot, T, N, cstr, x1_0, x2_0, xCovar0, addGP, referenceVarTraj = 
     lbbin = [0]
     ubbin = [1]
 
-    invCDFVarphiEpsilon = norm.ppf(0.25)
-    smallEps = 1e-6
+    invCDFVarphiEpsilon = norm.ppf(0.15)
+    smallEps = 1e-9
 
     x_init = [x1_0, x2_0]
-    xcovar_init = xCovar0
+    xcovar_init_zero = np.fmax([0]*stateCovarLen, stateCovarLowerLim)
+    xcovar_init = np.fmax(xCovar0, xcovar_init_zero).tolist()
 
     M = 4 # RK4 steps per interval
     DT = T/N/M
@@ -314,12 +315,12 @@ def solveMINLP(plot, T, N, cstr, x1_0, x2_0, xCovar0, addGP, referenceVarTraj = 
     w0 += [0]
     discrete += [True]
 
-    if addGP: 
-        g += [X0[0] - C_th + invCDFVarphiEpsilon * sqrt(XCOVAR0[0] + smallEps) + bigMx1*(1 - ZC0)]
-        g += [T_th - X0[1] + invCDFVarphiEpsilon * sqrt(XCOVAR0[3] + smallEps) + bigMx2*(1 - ZT0)] 
-    else: 
-        g += [X0[0] - C_th + bigMx1*(1 - ZC0)]
-        g += [T_th - X0[1] + bigMx2*(1 - ZT0)] 
+    # if addGP: 
+    #     g += [X0[0] - C_th + invCDFVarphiEpsilon * sqrt(XCOVAR0[0]) + bigMx1*(1 - ZC0)]
+    #     g += [T_th - X0[1] + invCDFVarphiEpsilon * sqrt(XCOVAR0[3]) + bigMx2*(1 - ZT0)] 
+    # else: 
+    g += [X0[0] - C_th + bigMx1*(1 - ZC0)]
+    g += [T_th - X0[1] + bigMx2*(1 - ZT0)] 
     
     g += [ZC0 + ZT0]
 
@@ -782,10 +783,12 @@ np_rng = np.random.default_rng(seed=0)
 x1_0_configs = []
 x2_0_configs = []
 while len(x1_0_configs) < numConfigs :
-    x_0_candidate = np_rng.random(2) * 0.1 
-    if x_0_candidate[0] > C_th or x_0_candidate[1] < T_th:
-        x1_0_configs += [x_0_candidate[0]]
-        x2_0_configs += [x_0_candidate[1]]
+    x_0_candidate = np_rng.random(2)
+    x1_0_candidate = x_0_candidate[0] * 0.1
+    x2_0_candidate = x_0_candidate[1] * 0.1
+    if x1_0_candidate > C_th or x2_0_candidate < T_th:
+        x1_0_configs += [x1_0_candidate]
+        x2_0_configs += [x2_0_candidate]
 
 totalCostSmoothOpList = []
 totalCostGPList = []

@@ -155,10 +155,10 @@ class cstrSimModel:
         ad = 0.03
         bd = 1.5
         xdot = [-1*x[0] + self.paramD*(1 - x[0])*math.exp(x[1]/(1 + x[1]/self.paramGamma)),
-                -1*x[1] + self.paramB*self.paramD*(1 - x[0])*exp(x[1]/(1 + x[1]/self.paramGamma)) + self.paramBeta*(u - x[1]) + ad*math.exp(-1*bd*u)] #
+                -1*x[1] + self.paramB*self.paramD*(1 - x[0])*math.exp(x[1]/(1 + x[1]/self.paramGamma)) + self.paramBeta*(u - x[1]) + ad*math.exp(-1*bd*u)] #
         return xdot
     
     def nomDynamics(self, x, t, u):
         xdot = [-1*x[0] + self.paramD*(1 - x[0])*math.exp(x[1]/(1 + x[1]/self.paramGamma)),
-                -1*x[1] + self.paramB*self.paramD*(1 - x[0])*exp(x[1]/(1 + x[1]/self.paramGamma)) + self.paramBeta*(u - x[1])]
+                -1*x[1] + self.paramB*self.paramD*(1 - x[0])*math.exp(x[1]/(1 + x[1]/self.paramGamma)) + self.paramBeta*(u - x[1])]
         return xdot
