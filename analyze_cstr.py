@@ -156,7 +156,8 @@ def satList(stateTraceFile, controlTraceFile):
     return sat_count_list
 
 def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [], u_Nom = []):
-    params = {'mathtext.default': 'regular' }          
+    params = {'mathtext.default': 'regular',
+              'pdf.fonttype' : 42}          
     plt.rcParams.update(params)
     nom_plotIdx = 0
     smoothOp_plotIdx = 1
@@ -345,15 +346,15 @@ avgControlEffortNom = avgControlEffort(N, Nom_state_trace_file, Nom_control_trac
 
 print("--STL sat--")
 print("Smooth Op: ", str(satCountSmoothOp))
-print("GP: ", str(satCountGP))
+print("LRi (GP): ", str(satCountGP))
 print("Nom: ", str(satCountNom))
 print("---STL sat list---")
 print("Smooth Op: ", str(satListSmoothOp))
-print("GP: ", str(satListGP))
+print("LRi (GP): ", str(satListGP))
 print("Nom: ", str(satListNom))
 print("--Control effort--")
 print("Smooth Op: ", str(avgControlEffortSmoothOp))
-print("GP: ", str(avgControlEffortGP))
+print("LRi (GP): ", str(avgControlEffortGP))
 print("Nom: ", str(avgControlEffortNom))
 
 smoothOp_state_trace_file.close()

@@ -134,7 +134,8 @@ def getTracesFor(init_x, init_y, stateTraceFile, controlTraceFile):
     return targetStateTraces, targetControlTraces
 
 def plotSol(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_GP_offlineCovar = [], u_GP_offlineCovar = [], x_Nom = [], u_Nom = [], goal_A_polygon_x = [], goal_A_polygon_y = [], obstacle_polygon_x = [], obstacle_polygon_y = []):
-    params = {'mathtext.default': 'regular' }          
+    params = {'mathtext.default': 'regular',
+              'pdf.fonttype' : 42}          
     plt.rcParams.update(params)
     nom_plotIdx = 0
     smoothOp_plotIdx = 1
@@ -258,8 +259,135 @@ def plotAllSol(N, plotControlTraj, stateTraceFileSmoothOp, controlTraceFileSmoot
         stateTracesNom, controlTracesNom = getTracesFor(initialState[0], initialState[1], stateTraceFileNom, controlTraceFileNom)
         plotSol(N, plotControlTraj, stateTracesSmoothOp, controlTracesSmoothOp, stateTracesGP, controlTracesGP, stateTraceGPofflineCovar, controlTraceGPofflineCovar, stateTracesNom, controlTracesNom, goal_x, goal_y, obstacle_x, obstacle_y)
 
+def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_GP_offlineCovar = [], u_GP_offlineCovar = [], x_Nom = [], u_Nom = [], goal_A_polygon_x = [], goal_A_polygon_y = [], obstacle_polygon_x = [], obstacle_polygon_y = []):
+    params = {'mathtext.default': 'regular',
+              'pdf.fonttype' : 42 }          
+    plt.rcParams.update(params)
+    nom_plotIdx = 0
+    smoothOp_plotIdx = 1
+    GP_plotIdx = 2
+    GP_offlineCovar_plotIdx = 3
+    
+    fig, ax = plt.subplots(3, 1, constrained_layout=True)
+
+    controller_label_x = 99
+    controller_label_y = 4.5
+
+    nom_color = 'xkcd:amethyst'
+    smoothOp_color = 'xkcd:windows blue'
+    lri_color = 'xkcd:orangish'
+
+    if len(goal_A_polygon_x) > 0:
+        goal_A_polygon_x_plot = [goal_A_polygon_x[0], goal_A_polygon_x[0], goal_A_polygon_x[1], goal_A_polygon_x[1]]
+        goal_A_polygon_y_plot = [goal_A_polygon_y[1], goal_A_polygon_y[0], goal_A_polygon_y[0], goal_A_polygon_y[1]] 
+        obstacle_polygon_x_plot = [obstacle_polygon_x[0], obstacle_polygon_x[0], obstacle_polygon_x[1], obstacle_polygon_x[1]]
+        obstacle_polygon_y_plot = [obstacle_polygon_y[1], obstacle_polygon_y[0], obstacle_polygon_y[0], obstacle_polygon_y[1]]
+        
+        ax[smoothOp_plotIdx].fill(goal_A_polygon_x_plot, goal_A_polygon_y_plot, 'g', alpha=0.5)
+        ax[smoothOp_plotIdx].plot(goal_A_polygon_x_plot + [goal_A_polygon_x[0]], goal_A_polygon_y_plot + [goal_A_polygon_y[1]], 'g')
+        ax[smoothOp_plotIdx].fill(obstacle_polygon_x_plot, obstacle_polygon_y_plot, 'lightslategray', alpha=0.5)
+        ax[smoothOp_plotIdx].plot(obstacle_polygon_x_plot + [obstacle_polygon_x[0]], obstacle_polygon_y_plot + [obstacle_polygon_y[1]], 'lightslategray')
+
+        ax[GP_plotIdx].fill(goal_A_polygon_x_plot, goal_A_polygon_y_plot, 'g', alpha=0.5)
+        ax[GP_plotIdx].plot(goal_A_polygon_x_plot + [goal_A_polygon_x[0]], goal_A_polygon_y_plot + [goal_A_polygon_y[1]], 'g')
+        ax[GP_plotIdx].fill(obstacle_polygon_x_plot, obstacle_polygon_y_plot, 'lightslategray', alpha=0.5)
+        ax[GP_plotIdx].plot(obstacle_polygon_x_plot + [obstacle_polygon_x[0]], obstacle_polygon_y_plot + [obstacle_polygon_y[1]], 'lightslategray')
+
+        # ax[GP_offlineCovar_plotIdx].fill(goal_A_polygon_x_plot, goal_A_polygon_y_plot, 'g', alpha=0.5)
+        # ax[GP_offlineCovar_plotIdx].plot(goal_A_polygon_x_plot + [goal_A_polygon_x[0]], goal_A_polygon_y_plot + [goal_A_polygon_y[1]], 'g')
+        # ax[GP_offlineCovar_plotIdx].fill(obstacle_polygon_x_plot, obstacle_polygon_y_plot, 'lightslategray', alpha=0.5)
+        # ax[GP_offlineCovar_plotIdx].plot(obstacle_polygon_x_plot + [obstacle_polygon_x[0]], obstacle_polygon_y_plot + [obstacle_polygon_y[1]], 'lightslategray')
+
+        ax[nom_plotIdx].fill(goal_A_polygon_x_plot, goal_A_polygon_y_plot, 'g', alpha=0.5)
+        ax[nom_plotIdx].plot(goal_A_polygon_x_plot + [goal_A_polygon_x[0]], goal_A_polygon_y_plot + [goal_A_polygon_y[1]], 'g')
+        ax[nom_plotIdx].fill(obstacle_polygon_x_plot, obstacle_polygon_y_plot, 'lightslategray', alpha=0.5)
+        ax[nom_plotIdx].plot(obstacle_polygon_x_plot + [obstacle_polygon_x[0]], obstacle_polygon_y_plot + [obstacle_polygon_y[1]], 'lightslategray')
+
+    ax[smoothOp_plotIdx].set_xlim(xlim[0], xlim[1])
+    ax[smoothOp_plotIdx].set_ylim(ylim[0], ylim[1])
+    ax[smoothOp_plotIdx].set_xlabel('$s_x\, (m)$')
+    ax[smoothOp_plotIdx].set_ylabel('$s_y\, (m)$')
+    ax[smoothOp_plotIdx].text(controller_label_x, controller_label_y, 'Smooth Robust', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
+
+    for traj in x_smoothOp:
+        ax[smoothOp_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=smoothOp_color)
+    ax[smoothOp_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
+
+    ax[GP_plotIdx].set_xlim(xlim[0], xlim[1])
+    ax[GP_plotIdx].set_ylim(ylim[0], ylim[1])
+    ax[GP_plotIdx].set_xlabel('$s_x\, (m)$')
+    ax[GP_plotIdx].set_ylabel('$s_y\, (m)$')
+    ax[GP_plotIdx].text(controller_label_x, controller_label_y, 'LRi-A', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
+
+    for traj in x_GP:
+        ax[GP_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=lri_color)
+    ax[GP_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
+
+    # ax[GP_offlineCovar_plotIdx].set_xlim(xlim[0], xlim[1])
+    # ax[GP_offlineCovar_plotIdx].set_ylim(ylim[0], ylim[1])
+    # ax[GP_offlineCovar_plotIdx].set_xlabel('$s_x\, (m)$')
+    # ax[GP_offlineCovar_plotIdx].set_ylabel('$s_y\, (m)$')
+    # ax[GP_offlineCovar_plotIdx].text(controller_label_x, controller_label_y, 'LLRi-PC', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
+
+    # for traj in x_GP_offlineCovar:
+    #     ax[GP_offlineCovar_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=lri_color)
+    # ax[GP_offlineCovar_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
+
+    ax[nom_plotIdx].set_xlim(xlim[0], xlim[1])
+    ax[nom_plotIdx].set_ylim(ylim[0], ylim[1])
+    ax[nom_plotIdx].set_xlabel('$s_x\, (m)$')
+    ax[nom_plotIdx].set_ylabel('$s_y\, (m)$')
+    ax[nom_plotIdx].text(controller_label_x, controller_label_y, 'Nominal', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
+
+    for traj in x_Nom:
+        ax[nom_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=nom_color)
+    ax[nom_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
+
+    if plotControl:
+        fig_u, ax_u = plt.subplots(2, 1, constrained_layout=True)
+        vSteerAngIdx = 0
+        accelIdx = 1
+        ax_u[vSteerAngIdx].grid(True)
+        ax_u[accelIdx].grid(True)
+        ax_u[vSteerAngIdx].set_ylabel("vSteerAng (rad/s)")
+        ax_u[accelIdx].set_ylabel("Acceleration (m/s^2)")
+        ax_u[vSteerAngIdx].set_xlabel("k")
+        ax_u[accelIdx].set_xlabel("k")
+        ax_u[vSteerAngIdx].set_ylim([-0.4, 0.4])
+        ax_u[accelIdx].set_ylim([-10, 10])
+        
+        for controlTraj in u_Nom:
+            tgrid = [k for k in range(len(controlTraj))]
+            nom_vSteerAng, = ax_u[vSteerAngIdx].plot(tgrid, controlTraj[:,0], '-o', alpha=0.5, linewidth=1, label="Nominal", color="steelblue")
+            nom_accel, = ax_u[accelIdx].plot(tgrid, controlTraj[:, 1], '-o', alpha=0.5, linewidth=1, label="Nominal", color="steelblue")
+            
+        for controlTraj in u_GP:
+            tgrid = [k for k in range(len(controlTraj))]
+            gp_vSteerAng, = ax_u[vSteerAngIdx].plot(tgrid, controlTraj[:,0], '-o', alpha=0.5, linewidth=1, label="GP", color="purple")
+            gp_accel, = ax_u[accelIdx].plot(tgrid, controlTraj[:, 1], '-o', alpha=0.5, linewidth=1, label="GP", color="purple")
+
+        for controlTraj in u_GP_offlineCovar:
+            tgrid = [k for k in range(len(controlTraj))]
+            gpOfflineCovar_vSteerAng, = ax_u[vSteerAngIdx].plot(tgrid, controlTraj[:,0], '-o', alpha=0.5, linewidth=1, label="GP (offlineCovar)", color="green")
+            gpOfflineCovar_accel, = ax_u[accelIdx].plot(tgrid, controlTraj[:, 1], '-o', alpha=0.5, linewidth=1, label="GP (offlineCovar)", color="green")
+
+        ax_u[vSteerAngIdx].legend(handles=[nom_vSteerAng, gp_vSteerAng, gpOfflineCovar_vSteerAng])
+        ax_u[accelIdx].legend(handles=[nom_accel, gp_accel, gpOfflineCovar_accel])
+
+def plotAllSol1(N, plotControlTraj, stateTraceFileSmoothOp, controlTraceFileSmoothOp, stateTraceFileGP, controlTraceFileGP, stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar, stateTraceFileNom, controlTraceFileNom):
+    initialStatesSmoothOp = getInitialStates(stateTraceFileSmoothOp)
+    initialStatesGP = getInitialStates(stateTraceFileGP)
+    initialStatesNom = getInitialStates(stateTraceFileNom)
+    for initialState in initialStatesSmoothOp:
+        stateTracesSmoothOp, controlTracesSmoothOp = getTracesFor(initialState[0], initialState[1], stateTraceFileSmoothOp, controlTraceFileSmoothOp)
+        stateTracesGP, controlTracesGP = getTracesFor(initialState[0], initialState[1], stateTraceFileGP, controlTraceFileGP)
+        stateTraceGPofflineCovar, controlTraceGPofflineCovar = getTracesFor(initialState[0], initialState[1], stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar)
+        stateTracesNom, controlTracesNom = getTracesFor(initialState[0], initialState[1], stateTraceFileNom, controlTraceFileNom)
+        plotSol1(N, plotControlTraj, stateTracesSmoothOp, controlTracesSmoothOp, stateTracesGP, controlTracesGP, stateTraceGPofflineCovar, controlTraceGPofflineCovar, stateTracesNom, controlTracesNom, goal_x, goal_y, obstacle_x, obstacle_y)
+
 def checkSAT(stateTraj, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y):
-    #This routine checks whether the trajectory satisfies the STL specification by using gurobi to try and assign integer variables, in hindsight not the most efficient way to check but it's been kept from the development process
+    #This routine checks whether the trajectory satisfies the STL specification by using gurobi to try and assign integer variables, 
+    #in hindsight not the most efficient way to check but it's been kept from the development process
     SAT = False
 
     if stateTraj[-1, -1] > goal_carAng[1] or stateTraj[-1, -1] < goal_carAng[0] or stateTraj[-1, 1] > goal_A_polygon_y[1] or stateTraj[-1, 3] < goal_min_speed:
@@ -341,8 +469,6 @@ def checkSAT(stateTraj, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, 
     # Concatenate decision variables and constraint terms
     w = vertcat(*w)
     g = vertcat(*g)
-
-    # J = 1
 
     # Create an NLP solver
     qp_prob = {'f': J, 'x': w, 'g': g}
@@ -503,7 +629,8 @@ nom_state_trace = open("./trace_data/autocar_state_trace_nom.txt", "r")
 nom_control_trace = open("./trace_data/autocar_control_trace_nom.txt", "r")
 
 plotAllSol(N, False, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace, LTVGP_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace)
-
+# plotAllSol1(N, False, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace, LTVGP_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace)
+# plt.show()
 avgRhoSmooth = avgRobustness(smoothOp_state_trace, smoothOp_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 avgRhoLTV = avgRobustness(LTVGP_state_trace, LTVGP_control_trace_offlineCovar, goal_x, goal_y, obstacle_x, obstacle_y)
 avgRhoLTV_offlinecovar = avgRobustness(LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, goal_x, goal_y, obstacle_x, obstacle_y)

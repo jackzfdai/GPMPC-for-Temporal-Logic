@@ -10,15 +10,11 @@ class singleTrackCarModel:
         self.x = SX.sym('x', 5) #[x, y, steerAng, v, carAng]
         self.u = SX.sym('u', 2) #[vSteerAng, accel]
         self.xlim = [0, 0]
-        self.xCovarLim = [0.0000001, 10]
         self.ylim = [0, 0]
-        self.yCovarLim = [0.0000001, 10]
         self.steerAnglim = [0, 0]
         #self.deltaCovarLim
         self.vlim = [0, 0]
-        self.vCovarLim = [0.0000001, 10]
         self.carAngLim = [0, 0]
-        self.carAngCovarLim = [0.0000001, 10]
         self.vSteerAngLim = [0, 0]
         self.accelLim = [0, 0]
         

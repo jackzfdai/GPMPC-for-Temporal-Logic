@@ -28,10 +28,7 @@ cstr_sim_sys = cstr.cstrSimModel(cstr_paramD, cstr_paramB, cstr_paramGamma, cstr
 cstr_x1lim, cstr_x2lim = cstr_sys.getStateLimits()
 cstr_ulim = cstr_sys.getInputLimits()
 
-#GP Parameter Estimation
-var_residual = 0.05
-K_residual = 0.25
-
+#GPytorch
 torch.manual_seed(0)
 
 #Initial conditions and problem parameters
@@ -414,8 +411,6 @@ def solveMINLP(plot, T, N, cstr, x1_0, x2_0, xCovar0, addGP, referenceVarTraj = 
     # Create an NLP solver
     nlp_prob = {'f': J, 'x': w, 'g': g}
     nlp_solver = nlpsol('nlp_solver', 'bonmin', nlp_prob, {"discrete": discrete})
-    #nlp_solver = nlpsol('nlp_solver', 'knitro', nlp_prob, {"discrete": discrete})
-    #nlp_solver = nlpsol('nlp_solver', 'ipopt', nlp_prob); # Solve relaxed problem
 
     # Solve the NLP
     sol = nlp_solver(x0=vertcat(*w0), lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
@@ -495,11 +490,6 @@ def solveSmoothRobustness(plot, T, N, cstr, x1_0, x2_0, referenceVarTraj = None,
     DT = T/N/M
 
     cstr_dynamics = cstr.getDiscreteDynamics(T/N, M, False)
-
-    # Objective term
-    L = 100*u**2 
-
-    cost = Function('cost', [x, u], [L])
             
     # Initial guess for u
     u_start = [DM([0])] * N
@@ -512,7 +502,7 @@ def solveSmoothRobustness(plot, T, N, cstr, x1_0, x2_0, referenceVarTraj = None,
         xk = sysk['xf']
         x_start += [xk]
 
-    print(x_start)
+    # print(x_start)
 
     # Start with an empty NLP
     w=[]
@@ -550,8 +540,6 @@ def solveSmoothRobustness(plot, T, N, cstr, x1_0, x2_0, referenceVarTraj = None,
         sysk = cstr_dynamics(x0=Xk, u=Uk)
         Xk_end = sysk['xf']
         
-        # J=J+cost(Xk, Uk)
-
         # New NLP variable for state at end of interval
         Xk = MX.sym('X_' + str(k+1), stateLen)
         w   += [Xk]
@@ -576,9 +564,7 @@ def solveSmoothRobustness(plot, T, N, cstr, x1_0, x2_0, referenceVarTraj = None,
 
     # Create an NLP solver
     nlp_prob = {'f': J, 'x': w, 'g': g}
-    # nlp_solver = nlpsol('nlp_solver', 'bonmin', nlp_prob, {"discrete": discrete})
-    #nlp_solver = nlpsol('nlp_solver', 'knitro', nlp_prob, {"discrete": discrete})
-    nlp_solver = nlpsol('nlp_solver', 'ipopt', nlp_prob); # Solve relaxed problem
+    nlp_solver = nlpsol('nlp_solver', 'ipopt', nlp_prob)
 
     # Solve the NLP
     sol = nlp_solver(x0=vertcat(*w0), lbx=lbw, ubx=ubw, lbg=lbg, ubg=ubg)
@@ -618,7 +604,7 @@ def solveSmoothRobustness(plot, T, N, cstr, x1_0, x2_0, referenceVarTraj = None,
 
 def controlLoop(plot, individual_plot, writeTraces, specificationController, T, N, cstr_control_model, cstr_sim_model, x1_0, x2_0, controller, controllerExtraParams=(), stateTrajFile=[], controlTrajFile=[]):
     dT = T/N
-    simRes = 0.01
+    simRes = 0.005
     
     maxSolveTime = 0
     totalSolveTime = 0
@@ -725,18 +711,17 @@ def plotSol(N, x1, x2, u, x1_openloops = [], x2_openloops = [], u_openloops = []
             plt.plot(tgrid_i, x2_openloops[i], alpha=0.5, linestyle='-', linewidth=1)
             plt.plot(tgrid_i, vertcat(u_openloops[i], DM.nan(1)), '-', alpha=0.5, linewidth=1)
 
-        
 #-----begin GP training from data----#
 # g_x1_list = []
 # g_x2_list = []
 # controlList = []
 # stateInputDataList = []
 
-# setpointList = [0.5, 0.7, 0.5, 0.8, 0.6]
-# x1_0List = [0, 0.2, 0.05, 0.15, 0]
-# x2_0List = [0, 0.1, 0.5, 0., 0.1]
+# setpointList = [0.55, 0.9, 0.5]
+# x1_0List = [0.01, 0.08, 0.06]
+# x2_0List = [0, 0.45, 0.4]
 
-# for i in range(3): 
+# for i in range(len(setpointList)): 
 #     _, _, _, _, _, _, controlData, predictedStateData, actualStateData = controlLoop(True, False, False, False, T/2, int(N/2), cstr_sys, cstr_sim_sys, x1_0List[i], x2_0List[i], controlToSetPoint, (setpointList[i], True))
     
 #     controlList += [controlData]

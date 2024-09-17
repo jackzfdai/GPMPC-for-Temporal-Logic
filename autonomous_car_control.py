@@ -151,7 +151,6 @@ def solveSetpointControl(plot, T, N, car, x0, y0, steerAng0, v0, carAng0, xN, yN
     x_init = [x0, y0, steerAng0, v0, carAng0]
 
     M = 4 # RK4 steps per interval
-    DT = T/N/M
 
     # Model equations
     car_dynamics = car.getDiscreteDynamics(T/N, M, False)
@@ -297,7 +296,6 @@ def solveSmoothedRobustnessNLP(plot, controlCost, T, N, car, x0, y0, steerAng0, 
     v_switch = car.getSwitchingVelocity()
 
     M = 4 # RK4 steps per interval
-    DT = T/N/M
 
     # Model equations
     car_dynamics = car.getDiscreteDynamics(T/N, M, False)
@@ -307,9 +305,7 @@ def solveSmoothedRobustnessNLP(plot, controlCost, T, N, car, x0, y0, steerAng0, 
     if controlCost:
         L = 0.5*(5*u[0]**2 + u[1]**2) 
     
-    L_terminal = 10*((x[0] - 40) ** 2 + (x[1] - 1.5))
     cost = Function('cost', [x, u], [L])
-    cost_terminal = Function('cost_terminal', [x, u], [L_terminal])
             
     # Initial guess for u
     u_start = [DM([0, 1])] * N
@@ -559,32 +555,17 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
     v_switch = car.getSwitchingVelocity()
 
     x_init = [sx0, sy0, steerAng0, v0, carAng0]
-    xcovar_init = [1e-9]*(stateLen**2)
-
-    smallEpsilon = 1e-6
-    smallRho = 0.25 #Since system is treated as discrete, even though discrete positions at 0,...,N might not be hitting obstacle, the 
-                    #plots interpolate these points and sometimes the interpolating lines look like they're going through the obstacle. 
-                    #Add small buffer around obstacle to remove this effect.
 
     sxRobustness = 0
     syRobustness = 0
-    steerAngRobustness = -0 
+    steerAngRobustness = 0 
     vRobustness = 0
     carAngRobustness = 0
 
     M = 4 # RK4 steps per interval
-    DT = T/N/M
-
-    #-----Debug-----#
-    xref = SX.sym('xref', stateLen)
-    #-----End Debug-----#
 
     # Objective term
     L = (u[0])**2 + (u[1])**2 
-    L_terminal = x[4]**2
-    cost = Function('cost', [x, xref, u], [L])
-
-    terminal_cost = Function('terminal_cost', [x, u], [L_terminal])
 
     det_cost = Function('det_cost', [x, u], [L])
 
@@ -626,9 +607,9 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
 
     # STL constraints
     # avoid
-    g += [obstacle_polygon_x[0] - X0[0] - smallRho + sxRobustness + bigMx*(1 - Zavoid_0[0])] 
-    g += [X0[0] - obstacle_polygon_x[1] - smallRho + sxRobustness + bigMx*(1 - Zavoid_0[1])] 
-    g += [X0[1] - obstacle_polygon_y[1] - smallRho + syRobustness + bigMy*(1 - Zavoid_0[2])] 
+    g += [obstacle_polygon_x[0] - X0[0] + sxRobustness + bigMx*(1 - Zavoid_0[0])] 
+    g += [X0[0] - obstacle_polygon_x[1] + sxRobustness + bigMx*(1 - Zavoid_0[1])] 
+    g += [X0[1] - obstacle_polygon_y[1] + syRobustness + bigMy*(1 - Zavoid_0[2])] 
     
     g += [Zavoid_0[0] + Zavoid_0[1] + Zavoid_0[2]]
 
@@ -713,9 +694,9 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
 
         # STL constraints
         # avoid
-        g += [obstacle_polygon_x[0] - Xk[0] - smallRho + sxRobustness + bigMx*(1 - Zavoid_k[0])] 
-        g += [Xk[0] - obstacle_polygon_x[1] - smallRho + sxRobustness + bigMx*(1 - Zavoid_k[1])] 
-        g += [Xk[1] - obstacle_polygon_y[1] - smallRho + syRobustness + bigMy*(1 - Zavoid_k[2])] 
+        g += [obstacle_polygon_x[0] - Xk[0] + sxRobustness + bigMx*(1 - Zavoid_k[0])] 
+        g += [Xk[0] - obstacle_polygon_x[1] + sxRobustness + bigMx*(1 - Zavoid_k[1])] 
+        g += [Xk[1] - obstacle_polygon_y[1] + syRobustness + bigMy*(1 - Zavoid_k[2])] 
     
         g += [Zavoid_k[0] + Zavoid_k[1] + Zavoid_k[2]]
     
@@ -755,8 +736,6 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
     w = vertcat(*w)
     g = vertcat(*g)
 
-    # J += terminal_cost(Xk, Uk)
-
     # Create an NLP solver
     qp_prob = {'f': J, 'x': w, 'g': g}
     qp_solver = qpsol('qp_solver', 'gurobi', qp_prob, {"discrete": discrete, "error_on_fail": False})
@@ -779,7 +758,6 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
     varPerTimeStep = stateLen + numBinVars + controlLen 
     stateRelatedVarPerTimeStep = stateLen + numBinVars
 
-    # feasible = np.any(w1_opt.full().flatten())
     if feasible == True:
         w1_opt = w1_opt.full().flatten()
         x_opt = w1_opt[0:varPerTimeStep*(N)+stateRelatedVarPerTimeStep][0::varPerTimeStep]
@@ -795,7 +773,7 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
         # print(state_opt)
         control_opt = np.transpose(np.concatenate([[vSteerAng_opt], [accel_opt]], axis=0))
         # print(control_opt)
-        manual_objective = np.sum([np.square(accel_opt), 10*np.square(vSteerAng_opt)])
+        # manual_objective = np.sum([np.square(accel_opt), np.square(vSteerAng_opt)])
         # print("objective (manually tallied): ", manual_objective)
 
         if plot == True:
@@ -831,36 +809,24 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
     v_switch = car.getSwitchingVelocity()
 
     x_init = [sx0, sy0, steerAng0, v0, carAng0]
-    xcovar_init = [1e-9]*stateCovarLen
+    xcovar_init = [0]*stateCovarLen
 
-    invCDFVarphiEpsilonRef1 = norm.ppf(0.15)
-    invCDFVarphiEpsilonRef2 = norm.ppf(0.35)
+    invCDFVarphiEpsilonRef1 = norm.ppf(0.01)
+    invCDFVarphiEpsilonCarAngRef1 = norm.ppf(0.01)
+    if onlineCovar:
+        invCDFVarphiEpsilonRef1 = norm.ppf(0.075)
+        invCDFVarphiEpsilonCarAngRef1 = norm.ppf(0.075)
     invCDFVarphiEpsilon = invCDFVarphiEpsilonRef1
-    invCDFVarphiEpsilonCarAngRef1 = norm.ppf(0.15)
-    invCDFVarphiEpsilonCarAngRef2 = norm.ppf(0.25)
     invCDFVarphiEpsilonCarAng = invCDFVarphiEpsilonCarAngRef1
-    uncertaintyLookaheadN = 50
-    uncertaintyLookaheadN2 = 20
-    smallEpsilon = 1e-5
-    smallRho = 0.25 #Since system is treated as discrete, even though discrete positions at 0,...,N might not be hitting obstacle, the 
-                    #plots interpolate these points and sometimes the interpolating lines look like they're going through the obstacle. 
-                    #Add small buffer around obstacle to remove this effect.
+
+    smallEpsilon = 8e-6
 
     M = 4 # RK4 steps per interval
-    DT = T/N/M
-
-    #-----Debug-----#
-    xref = SX.sym('xref', stateLen)
-    #-----End Debug-----#
 
     # Objective term
     L = (u[0])**2 + (u[1])**2 
-    L_terminal = x[4]**2
+    
     cost = Function('cost', [x, u], [L])
-
-    terminal_cost = Function('terminal_cost', [x, u], [L_terminal])
-
-    det_cost = Function('det_cost', [x, u], [L])
 
     # Start with an empty NLP
     w=[]
@@ -906,18 +872,11 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
 
     eventuallyAlwaysList = [Zreach_0]
 
-    if N == 8:
-        print("test")
     # STL constraints
     # avoid
-    if onlineCovar == True:
-        g += [obstacle_polygon_x[0] - X0[0] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVAR0[0] + smallEpsilon) + bigMx*(1 - Zavoid_0[0])] 
-        g += [X0[0] - obstacle_polygon_x[1] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVAR0[0] + smallEpsilon) + bigMx*(1 - Zavoid_0[1])] 
-        g += [X0[1] - obstacle_polygon_y[1] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVAR0[6] + smallEpsilon) + bigMy*(1 - Zavoid_0[2])]
-    else:
-        g += [obstacle_polygon_x[0] - X0[0] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 0]) + bigMx*(1 - Zavoid_0[0])] 
-        g += [X0[0] - obstacle_polygon_x[1] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 0]) + bigMx*(1 - Zavoid_0[1])] 
-        g += [X0[1] - obstacle_polygon_y[1] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 6]) + bigMy*(1 - Zavoid_0[2])] 
+    g += [obstacle_polygon_x[0] - X0[0] + bigMx*(1 - Zavoid_0[0])] # No constraint tightening on k=0, since x_s given w/o uncertainty
+    g += [X0[0] - obstacle_polygon_x[1] + bigMx*(1 - Zavoid_0[1])] 
+    g += [X0[1] - obstacle_polygon_y[1] + bigMy*(1 - Zavoid_0[2])] 
     
     g += [Zavoid_0[0] + Zavoid_0[1] + Zavoid_0[2]]
 
@@ -925,33 +884,19 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
     ubg += [2*bigMx, 2*bigMx, 2*bigMy, 3]
 
     # # #reach
-    if onlineCovar == True:
-        g += [X0[0] - goal_A_polygon_x[0] + invCDFVarphiEpsilon * sqrt(XCOVAR0[0] + smallEpsilon) + bigMx*(1 - Zreach_0)] 
-        g += [goal_A_polygon_x[1] - X0[0] + invCDFVarphiEpsilon * sqrt(XCOVAR0[0] + smallEpsilon) + bigMx*(1 - Zreach_0)] 
-        g += [goal_A_polygon_y[1] - X0[1] + invCDFVarphiEpsilon * sqrt(XCOVAR0[6] + smallEpsilon) + bigMy*(1 - Zreach_0)] 
-        g += [X0[1] - goal_A_polygon_y[0] + invCDFVarphiEpsilon * sqrt(XCOVAR0[6] + smallEpsilon) + bigMy*(1 - Zreach_0)]
-        g += [X0[3] - goal_min_speed + invCDFVarphiEpsilon * sqrt(XCOVAR0[18] + smallEpsilon) + bigMv*(1 - Zreach_0)]
-        g += [X0[4] - goal_carAng[0] + invCDFVarphiEpsilonCarAng * sqrt(XCOVAR0[24] + smallEpsilon) + bigMcarAng*(1 - Zreach_0)]
-        g += [goal_carAng[1] - X0[4] + invCDFVarphiEpsilonCarAng * sqrt(XCOVAR0[24] + smallEpsilon) + bigMcarAng*(1 - Zreach_0)]
-    else:
-        g += [X0[0] - goal_A_polygon_x[0] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 0]) + bigMx*(1 - Zreach_0)] 
-        g += [goal_A_polygon_x[1] - X0[0] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 0]) + bigMx*(1 - Zreach_0)] 
-        g += [goal_A_polygon_y[1] - X0[1] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 6]) + bigMy*(1 - Zreach_0)] 
-        g += [X0[1] - goal_A_polygon_y[0] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 6]) + bigMy*(1 - Zreach_0)]
-        g += [X0[3] - goal_min_speed + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 18]) + bigMv*(1 - Zreach_0)]
-        g += [X0[4] - goal_carAng[0] + invCDFVarphiEpsilonCarAng * sqrt(stateCovarTrajRef[0, 24]) + bigMcarAng*(1 - Zreach_0)]
-        g += [goal_carAng[1] - X0[4] + invCDFVarphiEpsilonCarAng * sqrt(stateCovarTrajRef[0, 24]) + bigMcarAng*(1 - Zreach_0)]
+    g += [X0[0] - goal_A_polygon_x[0] + bigMx*(1 - Zreach_0)] 
+    g += [goal_A_polygon_x[1] - X0[0] + bigMx*(1 - Zreach_0)] 
+    g += [goal_A_polygon_y[1] - X0[1] + bigMy*(1 - Zreach_0)] 
+    g += [X0[1] - goal_A_polygon_y[0] + bigMy*(1 - Zreach_0)]
+    g += [X0[3] - goal_min_speed + bigMv*(1 - Zreach_0)]
+    g += [X0[4] - goal_carAng[0] + bigMcarAng*(1 - Zreach_0)]
+    g += [goal_carAng[1] - X0[4] + bigMcarAng*(1 - Zreach_0)]
 
     lbg += [0, 0, 0, 0, 0, 0, 0]
     ubg += [2*bigMx, 2*bigMx, 2*bigMy, 2*bigMy, 2*bigMv, 2*bigMcarAng, 2*bigMcarAng]
 
-    # envelope
-    if onlineCovar == True:
-        g += [X0[1] - ylim[0] + invCDFVarphiEpsilon * sqrt(XCOVAR0[6] + smallEpsilon)]
-        g += [ylim[1] - X0[1] + invCDFVarphiEpsilon * sqrt(XCOVAR0[6] + smallEpsilon)]
-    else:
-        g += [X0[1] - ylim[0] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 6])]
-        g += [ylim[1] - X0[1] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[0, 6])]
+    g += [X0[1] - ylim[0]]
+    g += [ylim[1] - X0[1]]
 
     lbg += [0, 0]
     ubg += [2*bigMy, 2*bigMy]
@@ -963,16 +908,6 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
         XCOVARk = XCOVAR0   
 
     for k in range(N):
-        if onlineCovar: 
-            if k < uncertaintyLookaheadN:
-                invCDFVarphiEpsilon = invCDFVarphiEpsilonRef1
-                invCDFVarphiEpsilonCarAng = invCDFVarphiEpsilonCarAngRef1
-            else:
-                invCDFVarphiEpsilon = 0
-                invCDFVarphiEpsilonCarAng = 0
-        else: 
-            invCDFVarphiEpsilon = invCDFVarphiEpsilonRef1
-
         # New NLP variable for the control
         Uk = MX.sym('U_' + str(k), controlLen)
         w   += [Uk]
@@ -1001,7 +936,7 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
         else:
             Fk = car_dynamics_k(x=Xk, u=Uk, xcovar=DM(stateCovarTrajRef[k, :]))
             Xk_end = Fk['xf_ltv']
-            J=J+det_cost(Xk, Uk)
+            J=J+cost(Xk, Uk)
             print("___xk end___")
             print(Xk_end)
 
@@ -1050,13 +985,13 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
         # STL constraints
         # avoid
         if onlineCovar == True:
-            g += [obstacle_polygon_x[0] - Xk[0] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVARk[0] + smallEpsilon) + bigMx*(1 - Zavoid_k[0])] 
-            g += [Xk[0] - obstacle_polygon_x[1] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVARk[0] + smallEpsilon) + bigMx*(1 - Zavoid_k[1])] 
-            g += [Xk[1] - obstacle_polygon_y[1] - smallRho + invCDFVarphiEpsilon * sqrt(XCOVARk[6] + smallEpsilon) + bigMy*(1 - Zavoid_k[2])]
+            g += [obstacle_polygon_x[0] - Xk[0] + invCDFVarphiEpsilon * sqrt(XCOVARk[0] + smallEpsilon) + bigMx*(1 - Zavoid_k[0])] 
+            g += [Xk[0] - obstacle_polygon_x[1] + invCDFVarphiEpsilon * sqrt(XCOVARk[0] + smallEpsilon) + bigMx*(1 - Zavoid_k[1])] 
+            g += [Xk[1] - obstacle_polygon_y[1] + invCDFVarphiEpsilon * sqrt(XCOVARk[6] + smallEpsilon) + bigMy*(1 - Zavoid_k[2])]
         else:
-            g += [obstacle_polygon_x[0] - Xk[0] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 0]) + bigMx*(1 - Zavoid_k[0])] 
-            g += [Xk[0] - obstacle_polygon_x[1] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 0]) + bigMx*(1 - Zavoid_k[1])] 
-            g += [Xk[1] - obstacle_polygon_y[1] - smallRho + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 6]) + bigMy*(1 - Zavoid_k[2])] 
+            g += [obstacle_polygon_x[0] - Xk[0] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 0]) + bigMx*(1 - Zavoid_k[0])] 
+            g += [Xk[0] - obstacle_polygon_x[1] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 0]) + bigMx*(1 - Zavoid_k[1])] 
+            g += [Xk[1] - obstacle_polygon_y[1] + invCDFVarphiEpsilon * sqrt(stateCovarTrajRef[k, 6]) + bigMy*(1 - Zavoid_k[2])] 
         
         g += [Zavoid_k[0] + Zavoid_k[1] + Zavoid_k[2]]
     
@@ -1109,9 +1044,6 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
     w = vertcat(*w)
     g = vertcat(*g)
 
-    # J += terminal_cost(Xk, Uk)
-
-    bonmin_options = {"node_limit": 300000}
     # Create an NLP solver
     qp_prob = {'f': J, 'x': w, 'g': g}
     qp_solver = qpsol('qp_solver', 'gurobi', qp_prob, {"discrete": discrete, "error_on_fail": False})
@@ -1126,13 +1058,6 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
     feasible = solver_stats['success']
 
     w1_opt = sol['x']
-    lam_w_opt = sol['lam_x']
-    lam_g_opt = sol['lam_g']
-
-    u1_ret = 0
-    u2_ret = 0
-    x1_ret = np.array([])
-    x2_ret = np.array([])
     
     stateCovar_opt = []
     state_opt = []
@@ -1145,7 +1070,6 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
         varPerTimeStep = stateLen + stateCovarLen + numBinVars + controlLen 
         stateRelatedVarPerTimeStep = stateLen + stateCovarLen
 
-    # feasible = np.any(w1_opt.full().flatten())
     if feasible == True:
         w1_opt = w1_opt.full().flatten()
         x_opt = w1_opt[0:varPerTimeStep*(N)+stateRelatedVarPerTimeStep][0::varPerTimeStep]
@@ -1185,8 +1109,8 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
         else:
             stateCovarTrajSim = generateCovariancePredictions(T/N, M, car, state_opt, control_opt)
             stateCovar_opt = stateCovarTrajSim
-        manual_objective = np.sum([np.square(accel_opt), 10*np.square(vSteerAng_opt)])
-        print("objective (manually tallied): ", manual_objective)
+        # manual_objective = np.sum([np.square(accel_opt), np.square(vSteerAng_opt)])
+        # print("objective (manually tallied): ", manual_objective)
 
         if plot == True:
             plotSol(N, x_opt, y_opt, steerAng_opt, v_opt, carAng_opt, vSteerAng_opt, accel_opt)
@@ -1331,15 +1255,15 @@ def controlLoopNomLTV(plot, writeTraces, T, N, simRes, car_control_model, car_si
         
         closedLoopPredictedStates += [stateTraj[1, :]]
 
-        print("current state: ")
+        print("Current state: ")
         print(stateVector)
-        print("control input: ")
+        print("Control input: ")
         print(controlTraj[0, :])
-        print("predicted state traj: ")
+        print("Predicted next state: ")
         print(stateTraj[1, :])
 
         nextStateVector = car_sim_model.getSingleTrackStates()
-        print("simulated state traj" )
+        print("Simulated next state" )
         print(nextStateVector)
 
         closedLoopStates += [nextStateVector]
@@ -1397,7 +1321,7 @@ def controlLoopLTV(plot, useGP, onlineCovar, writeTraces, T, N, simRes, car_cont
 
     for i in range(N):
         if stateVector[0] > obstacle_polygon_x[0] and stateVector[0] < obstacle_polygon_x[1] and stateVector[1] > obstacle_polygon_y[0] and stateVector[1] < obstacle_polygon_y[1]:
-            print("starting state infeasible. Exiting")
+            print("Starting state infeasible. Exiting")
             break
 
         stateTraj = []
@@ -1424,15 +1348,15 @@ def controlLoopLTV(plot, useGP, onlineCovar, writeTraces, T, N, simRes, car_cont
 
         closedLoopPredictedStates += [stateTraj[1, :]]
 
-        print("current state: ")
+        print("Current state: ")
         print(stateVector)
-        print("control input: ")
+        print("Control input: ")
         print(controlTraj[0, :])
-        print("predicted state traj: ")
+        print("Predicted next state: ")
         print(stateTraj[1, :])
 
         nextStateVector = car_sim_model.getSingleTrackStates()
-        print("simulated state traj" )
+        print("Simulated next state" )
         print(nextStateVector)
 
         closedLoopStates += [nextStateVector]
@@ -1440,7 +1364,7 @@ def controlLoopLTV(plot, useGP, onlineCovar, writeTraces, T, N, simRes, car_cont
 
         stateTrajRef = np.concatenate((np.array([stateVector]), stateTraj[2:, :]), axis=0)
         controlTrajRef = controlTraj[1:, :]
-        stateCovarTrajRef = np.concatenate((np.array([[1e-9]*(stateCovarTrajRef.shape[1])]), stateCovarTraj[2:, :]))
+        stateCovarTrajRef = np.concatenate((np.array([[0]*(stateCovarTrajRef.shape[1])]), stateCovarTraj[2:, :]))
        
 
     closedLoopStates = np.vstack(closedLoopStates)
@@ -1499,15 +1423,15 @@ def controlLoopSetpoint(plot, T, N, simRes, car_control_model, car_sim_model, x0
         closedLoopControlTraj += [controlTraj[:, 0]]
         car_sim_model.simNext(True, T/N, simRes, vSteerAng, accel)
         
-        print("current state: ")
+        print("Current state: ")
         print(stateVector)
-        print("control input: ")
+        print("Control input: ")
         print(controlTraj[:, 0])
-        print("predicted state traj: ")
+        print("Predicted next state: ")
         print(stateTraj[:, 1])
 
         nextStateVector = car_sim_model.getSingleTrackStates()
-        print("simulated state traj" )
+        print("Simulated next state" )
         print(nextStateVector)
 
         closedLoopStates += [nextStateVector]
@@ -1568,15 +1492,15 @@ def controlLoop(plot, controlCost, writeTraces, T, N, simRes, car_control_model,
         
         closedLoopPredictedStates += [stateTraj[:, 1]]
 
-        print("current state: ")
+        print("Current state: ")
         print(stateVector)
-        print("control input: ")
+        print("Control input: ")
         print(controlTraj[:, 0])
-        print("predicted state traj: ")
+        print("Predicted next state: ")
         print(stateTraj[:, 1])
 
         nextStateVector = car_sim_model.getSingleTrackStates()
-        print("simulated state traj" )
+        print("Simulated next state" )
         print(nextStateVector)
 
         closedLoopStates += [nextStateVector]
@@ -1744,8 +1668,8 @@ def testLoopLTV(numRuns, onlineCovar, stateTrace, controlTrace, start_x, start_y
         num_itersLoopLTV += num_itersLTV
         
         print("-----LTV stats-----")
-        print("x_init, y_init: ", str(start_x), ", ", str(start_y))
-        print("i: ", str(i))
+        # print("x_init, y_init: ", str(start_x), ", ", str(start_y))
+        # print("i: ", str(i))
         print("Avg time: ", str(avgSolveTimeLTV))
         print("Max time: ", str(maxSolveTimeLTV))
 
@@ -1763,9 +1687,9 @@ def testLoopNomLTV(numRuns, start_x, start_y, goal_x, goal_y, obstacle_x, obstac
         totalSolveTimeLoopNomLTV += totalSolveTimeNomLTV
         num_itersLoopNomLTV += num_itersNomLTV
 
-        print("-----LTV stats-----")
-        print("x_init, y_init: ", str(start_x), ", ", str(start_y))
-        print("i: ", str(i))
+        print("-----Nom stats-----")
+        # print("x_init, y_init: ", str(start_x), ", ", str(start_y))
+        # print("i: ", str(i))
         print("Avg time: ", str(avgSolveTimeNomLTV))
         print("Max time: ", str(maxSolveTimeNomLTV))
 
@@ -1795,13 +1719,18 @@ start_y = start_xy_rng.random(30) * 2 + 0.5
 print(start_x)
 print(start_y)
 
+smallObstacleRho = 0.25 #Since system is treated as discrete, even though discrete positions at 0,...,N might not be hitting obstacle, the 
+                        #plots interpolate these points and sometimes the interpolating lines look like they're going through the obstacle. 
+                        #Add small buffer around obstacle to remove this effect. (in effect, the obstacle "seen" by the controller is bigger
+                        #than the displayed obstacle). 
+
 totalTimeNomLTV = 0
 totalNumItersNomLTV = 0
 for config in configs:
     goal_x = [config, 100]
     goal_y = [0, 3] 
-    obstacle_x = [20, config]
-    obstacle_y = [0, 3]
+    obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
+    obstacle_y = [0, 3 + smallObstacleRho]
     for i in range(numStartPositions):
         x_init = start_x[i]
         y_init = start_y[i]
@@ -1820,8 +1749,8 @@ totalNumItersSmooth = 0
 for config in configs:
     goal_x = [config, 100]
     goal_y = [0, 3] 
-    obstacle_x = [20, config]
-    obstacle_y = [0, 3]
+    obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
+    obstacle_y = [0, 3 + smallObstacleRho]
 
     for i in range(numStartPositions):
         x_init = start_x[i]
@@ -1840,8 +1769,8 @@ totalNumItersLTV = 0
 for config in configs:
     goal_x = [config, 100]
     goal_y = [0, 3] 
-    obstacle_x = [20, config]
-    obstacle_y = [0, 3]
+    obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
+    obstacle_y = [0, 3 + smallObstacleRho]
     for i in range(numStartPositions):
         x_init = start_x[i]
         y_init = start_y[i]
@@ -1860,8 +1789,8 @@ totalNumItersLTV_offlineCovar = 0
 for config in configs:
     goal_x = [config, 100]
     goal_y = [0, 3] 
-    obstacle_x = [20, config]
-    obstacle_y = [0, 3]
+    obstacle_x = [20-smallObstacleRho, config+smallObstacleRho]
+    obstacle_y = [0, 3+smallObstacleRho]
     for i in range(numStartPositions):
         x_init = start_x[i]
         y_init = start_y[i]

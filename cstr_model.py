@@ -13,7 +13,7 @@ class cstrModel:
         self.paramB = paramB
         self.paramGamma = paramGamma
         self.paramBeta = paramBeta
-        self.x = SX.sym('x', 2) #[x1: reactant concentration, x2: reactor temperature]
+        self.x = SX.sym('x', 2) #[x1: reactor composition, x2: reactor temperature]
         self.u = SX.sym('u', 1) #[u: cooling jacket temperature]
         self.x1lim = [-1, 2]
         self.x2lim = [-1, 2]
@@ -142,20 +142,24 @@ class cstrSimModel:
         t = numpy.arange(0, interval, simResolution)
 
         x_next = odeint(self.dynamics, self.stateVector, t, args=(u,))
-        print(x_next[-1])
-        dx1 = np_rng.normal(0, 0.003)
-        dx2 = np_rng.normal(0, 0.003)
-        noise = np.array([dx1, dx2])
-        print("x next dist: ", x_next[-1])
-        print("noise: ", noise)
+        
+        noise = np.array([0, 0])
+        if addNoise:
+            dx1 = np_rng.normal(0, 0.001)
+            dx2 = np_rng.normal(0, 0.001)
+            noise = np.array([dx1, dx2])
+        # print("x next no noise: ", x_next[-1])
+        # print("noise: ", noise)
+        
         self.stateVector = x_next[-1] + noise
         return self.stateVector
     
     def dynamics(self, x, t, u):
-        ad = 0.03
-        bd = 1.5
+        ad = 0.035
+        bd = 3.95
+        cd = 0.6
         xdot = [-1*x[0] + self.paramD*(1 - x[0])*math.exp(x[1]/(1 + x[1]/self.paramGamma)),
-                -1*x[1] + self.paramB*self.paramD*(1 - x[0])*math.exp(x[1]/(1 + x[1]/self.paramGamma)) + self.paramBeta*(u - x[1]) + ad*math.exp(-1*bd*u)] #
+                -1*x[1] + self.paramB*self.paramD*(1 - x[0])*math.exp(x[1]/(1 + x[1]/self.paramGamma)) + self.paramBeta*(u - x[1]) + ad*math.exp(-1*bd*(u+cd))] #
         return xdot
     
     def nomDynamics(self, x, t, u):
