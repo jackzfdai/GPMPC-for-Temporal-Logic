@@ -1,10 +1,6 @@
 from scipy.integrate import odeint
 from scipy.integrate import solve_ivp
 import numpy
-import torch
-import matplotlib.pyplot as plt
-from matplotlib.pyplot import title, legend
-import math
 
 from vehiclemodels.parameters_vehicle2 import parameters_vehicle2
 from vehiclemodels.init_ks import init_ks
@@ -82,7 +78,7 @@ class st_car_sim:
 
         x_next = odeint(dynamics, self.stateVector, t, args=(u, self.p))
         print(x_next[-1])
-        stateLen = len(self.stateVector)
+        # stateLen = len(self.stateVector)
         noise = 0
         if useDisturbance == True:
             dsx = self.np_rng.normal(0, 0.05)
