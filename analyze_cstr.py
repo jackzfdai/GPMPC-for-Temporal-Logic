@@ -4,13 +4,6 @@ from casadi import *
 
 import cstr_model as cstr
 
-smoothOp_state_trace_file = open("./trace_data/cstr_30x30_state_traces_smoothOp.txt", "r")
-smoothOp_control_trace_file = open("./trace_data/cstr_30x30_control_traces_smoothOp.txt", "r")
-GP_state_trace_file = open("./trace_data/cstr_30x30_state_traces_GP.txt", "r")
-GP_control_trace_file = open("./trace_data/cstr_30x30_control_traces_GP.txt", "r")
-Nom_state_trace_file = open("./trace_data/cstr_30x30_state_traces_nom.txt", "r")
-Nom_control_trace_file = open("./trace_data/cstr_30x30_control_traces_nom.txt", "r")
-
 cstr_paramD = 0.078
 cstr_paramB = 8
 cstr_paramGamma = 20
@@ -37,6 +30,18 @@ bigMx2 = (cstr_x2lim[1] - cstr_x2lim[0]) + 1
 
 C_th = 0.1
 T_th = 0.5
+
+prstlEpsilon = 0.2
+
+smoothOp_state_trace_file = open("./trace_data/cstr_30x30_state_traces_smoothOp.txt", "r")
+smoothOp_control_trace_file = open("./trace_data/cstr_30x30_control_traces_smoothOp.txt", "r")
+smoothOp_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_smoothOp.txt", "r")
+GP_state_trace_file = open("./trace_data/cstr_30x30_state_traces_GP_eps"+str(prstlEpsilon)+".txt", "r")
+GP_control_trace_file = open("./trace_data/cstr_30x30_control_traces_GP_eps"+str(prstlEpsilon)+".txt", "r")
+GP_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_GP_eps"+str(prstlEpsilon)+".txt", "r")
+Nom_state_trace_file = open("./trace_data/cstr_30x30_state_traces_nom.txt", "r")
+Nom_control_trace_file = open("./trace_data/cstr_30x30_control_traces_nom.txt", "r")
+Nom_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_nom.txt", "r")
 
 def satLoop(stateTraceFile):
     stateTraceFile.seek(0)
@@ -311,8 +316,10 @@ def checkSAT(N, stateTraj):
 
 def avgControlEffort(N, stateTraceFile, controlTraceFile):
     avgControlEffort = -1
+    controlEffortStd = 0
     initialStates = getInitialStates(stateTraceFile)
 
+    controlEffortList = []
     totalControlEffort = 0
     recursivelyFeasibleCount = 0
     for initialState in initialStates:
@@ -324,13 +331,45 @@ def avgControlEffort(N, stateTraceFile, controlTraceFile):
                 recursivelyFeasibleCount += 1
                 controlEffort = np.sum(np.square(controlTrace), axis=None)
                 totalControlEffort += controlEffort
+                controlEffortList += [controlEffort]
     
     if recursivelyFeasibleCount > 0:
         avgControlEffort = totalControlEffort/recursivelyFeasibleCount
 
-    return avgControlEffort
+    if len(controlEffortList) > 0:
+        controlEffortList = np.vstack(controlEffortList)
+        avgControlEffort = controlEffortList.mean()
+        controlEffortStd = controlEffortList.std()
+        controlEffortQ95, controlEffortQ5 = np.percentile(controlEffortList, [95, 5])
+        controlEffortIQR = controlEffortQ95 - controlEffortQ5
+
+    return avgControlEffort, controlEffortStd, controlEffortIQR
+
+def timingStatsAll(timingTrace):
+    timingAvg = -1
+    timingStddev = 0
+
+    timingTrace.seek(0)
+
+    solveTimes = []
+    for line in timingTrace:
+        if line != "~\n":
+            solveTime = float(line.split("\n")[0])
+            solveTimes.append(solveTime)
+
+    solveTimes = np.array(solveTimes)
+    timingAvg = solveTimes.mean()
+    timingStddev = solveTimes.std()
+    timingQ95, timingQ5 = np.percentile(solveTimes, [95, 5])
+    timingIQR = timingQ95 - timingQ5
+    
+    return timingAvg, timingStddev, timingIQR
 
 plotAllSol(N, smoothOp_state_trace_file, smoothOp_control_trace_file, GP_state_trace_file, GP_control_trace_file, Nom_state_trace_file, Nom_control_trace_file)
+
+solveTimeAvgNom, solveTimeStdNom, solveTimeIqrNom = timingStatsAll(Nom_solveTime_trace_file)
+solveTimeAvgSmoothOp, solveTimeStdSmoothOp, solveTimeIqrSmoothOp = timingStatsAll(smoothOp_solveTime_trace_file)
+solveTimeAvgGP, solveTimeStdGP, solveTimeIqrGP = timingStatsAll(GP_solveTime_trace_file)
 
 satCountNom = satLoop(Nom_state_trace_file)
 satCountGP = satLoop(GP_state_trace_file)
@@ -340,9 +379,9 @@ satListSmoothOp = satList(smoothOp_state_trace_file, smoothOp_control_trace_file
 satListGP = satList(GP_state_trace_file, GP_control_trace_file)
 satListNom = satList(Nom_state_trace_file, Nom_control_trace_file)
 
-avgControlEffortSmoothOp = avgControlEffort(N, smoothOp_state_trace_file, smoothOp_control_trace_file)
-avgControlEffortGP = avgControlEffort(N, GP_state_trace_file, GP_control_trace_file)
-avgControlEffortNom = avgControlEffort(N, Nom_state_trace_file, Nom_control_trace_file)
+avgControlEffortSmoothOp, controlEffortStdSmoothOp, controlEffortIqrSmoothOp = avgControlEffort(N, smoothOp_state_trace_file, smoothOp_control_trace_file)
+avgControlEffortGP, controlEffortStdGP, controlEffortIqrGP = avgControlEffort(N, GP_state_trace_file, GP_control_trace_file)
+avgControlEffortNom, controlEffortStdNom, controlEffortIqrNom = avgControlEffort(N, Nom_state_trace_file, Nom_control_trace_file)
 
 print("--STL sat--")
 print("Smooth Op: ", str(satCountSmoothOp))
@@ -352,16 +391,23 @@ print("---STL sat list---")
 print("Smooth Op: ", str(satListSmoothOp))
 print("LRi (GP): ", str(satListGP))
 print("Nom: ", str(satListNom))
-print("--Control effort--")
-print("Smooth Op: ", str(avgControlEffortSmoothOp))
-print("LRi (GP): ", str(avgControlEffortGP))
-print("Nom: ", str(avgControlEffortNom))
+print("--_Control effort--_")
+print("Smooth Op Avg: ", str(avgControlEffortSmoothOp), " Std: ", str(controlEffortStdSmoothOp), " IQR: ", str(controlEffortIqrSmoothOp))
+print("LRi (GP) Avg: ", str(avgControlEffortGP), " Std: ", str(controlEffortStdGP), " IQR: ", str(controlEffortIqrGP))
+print("Nom Avg: ", str(avgControlEffortNom), " Std: ", str(controlEffortStdNom), " IQR: ", str(controlEffortIqrNom))
+print("---Solve Time---")
+print("Smooth Op Avg: ", str(solveTimeAvgSmoothOp), " Std: ", str(solveTimeStdSmoothOp), " IQR: ", str(solveTimeIqrSmoothOp))
+print("LRi (GP) Avg: ", str(solveTimeAvgGP), " Std: ", str(solveTimeStdGP), " IQR: ", str(solveTimeIqrGP))
+print("Nom Avg: ", str(solveTimeAvgNom), " Std: ", str(solveTimeStdNom), " IQR: ", str(solveTimeIqrNom))
 
 smoothOp_state_trace_file.close()
 smoothOp_control_trace_file.close()
+smoothOp_solveTime_trace_file.close()
 GP_state_trace_file.close()
 GP_control_trace_file.close()
+GP_solveTime_trace_file.close()
 Nom_state_trace_file.close()
 Nom_control_trace_file.close()
+Nom_solveTime_trace_file.close()
 
 plt.show()

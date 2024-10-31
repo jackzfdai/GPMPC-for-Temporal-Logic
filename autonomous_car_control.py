@@ -10,15 +10,6 @@ from casadi import *
 import single_track_model_car as stcar
 from vehicle_sim_models import st_car_sim
 
-smoothOp_state_trace = open("./trace_data/autocar_state_traces_smoothOp.txt", "w")
-smoothOp_control_trace = open("./trace_data/autocar_control_traces_smoothOp.txt", "w")
-LTVGP_state_trace = open("./trace_data/autocar_state_trace_LTVGP.txt", "w")
-LTVGP_control_trace = open("./trace_data/autocar_control_trace_LTVGP.txt", "w")
-LTVGP_state_trace_offlineCovar = open("./trace_data/autocar_state_trace_LTVGP_offlineCovar.txt", "w")
-LTVGP_control_trace_offlineCovar = open("./trace_data/autocar_control_trace_LTVGP_offlineCovar.txt", "w")
-nom_state_trace = open("./trace_data/autocar_state_trace_nom.txt", "w")
-nom_control_trace = open("./trace_data/autocar_control_trace_nom.txt", "w")
-
 # load parameters
 p = parameters_vehicle2()
 g = 9.81  # [m/s^2]
@@ -782,7 +773,7 @@ def solveNomLTV(plot, T, N, car, stateTrajRef, controlTrajRef, sx0, sy0, steerAn
 
     return proc_runtime, feasible, state_opt, control_opt
 
-def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCovarTrajRef, sx0, sy0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y):
+def solveLTV(plot, onlineCovar, prstlEpsilon, T, N, car, stateTrajRef, controlTrajRef, stateCovarTrajRef, sx0, sy0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y):
     feasible = False
 
     # Declare model variables
@@ -811,13 +802,13 @@ def solveLTV(plot, onlineCovar, T, N, car, stateTrajRef, controlTrajRef, stateCo
     x_init = [sx0, sy0, steerAng0, v0, carAng0]
     xcovar_init = [0]*stateCovarLen
 
-    invCDFVarphiEpsilonRef1 = norm.ppf(0.01)
-    invCDFVarphiEpsilonCarAngRef1 = norm.ppf(0.01)
-    if onlineCovar:
-        invCDFVarphiEpsilonRef1 = norm.ppf(0.075)
-        invCDFVarphiEpsilonCarAngRef1 = norm.ppf(0.075)
-    invCDFVarphiEpsilon = invCDFVarphiEpsilonRef1
-    invCDFVarphiEpsilonCarAng = invCDFVarphiEpsilonCarAngRef1
+    invCDFVarphiEpsilon = norm.ppf(prstlEpsilon)
+    invCDFVarphiEpsilonCarAng = norm.ppf(prstlEpsilon)
+    # if onlineCovar:
+    #     invCDFVarphiEpsilonRef1 = norm.ppf(0.075)
+    #     invCDFVarphiEpsilonCarAngRef1 = norm.ppf(0.075)
+    # invCDFVarphiEpsilon = invCDFVarphiEpsilonRef1
+    # invCDFVarphiEpsilonCarAng = invCDFVarphiEpsilonCarAngRef1
 
     smallEpsilon = 8e-6
 
@@ -1208,7 +1199,7 @@ def plotSol(N, x, y, steerAng, v, carAng, vSteerAng, accel):
     plt.legend(['x','y', 'steerAng', 'v', 'carAng', 'vSteerAng', 'accel'])
     plt.grid(True)
 
-def controlLoopNomLTV(plot, writeTraces, T, N, simRes, car_control_model, car_sim_model, stateTrajRef0, controlTrajRef0, x0, y0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y, stateTrajFile = [], controlTrajFile = []):
+def controlLoopNomLTV(plot, writeTraces, T, N, simRes, car_control_model, car_sim_model, stateTrajRef0, controlTrajRef0, x0, y0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y, stateTrajFile = [], controlTrajFile = [], solveTimeFile = []):
     car_sim_model.setInitialState(x0, y0, steerAng0, v0, carAng0)
 
     stateVector = np.array([x0, y0, steerAng0, v0, carAng0])
@@ -1222,6 +1213,7 @@ def controlLoopNomLTV(plot, writeTraces, T, N, simRes, car_control_model, car_si
     stateTrajRef = stateTrajRef0
     controlTrajRef = controlTrajRef0
     
+    solveTimes = []
     totalSolveTime = 0
     maxSolveTime = 0
 
@@ -1238,6 +1230,7 @@ def controlLoopNomLTV(plot, writeTraces, T, N, simRes, car_control_model, car_si
         
         num_iters += 1 
         totalSolveTime += solveTime
+        solveTimes += [solveTime]
         if solveTime > maxSolveTime:
             maxSolveTime = solveTime
 
@@ -1296,10 +1289,13 @@ def controlLoopNomLTV(plot, writeTraces, T, N, simRes, car_control_model, car_si
         for i in range(closedLoopControlTraj.shape[0]):
             controlTrajFile.write(str(closedLoopControlTraj[i, 0]) + "," + str(closedLoopControlTraj[i, 1]) + "\n")
         controlTrajFile.write("~\n")
+        for i in range(len(solveTimes)):
+            solveTimeFile.write(str(solveTimes[i]) + "\n")
+        solveTimeFile.write("~\n")
 
     return avgSolveTime, maxSolveTime, totalSolveTime, num_iters, feasible, closedLoopControlTraj, closedLoopPredictedStates, closedLoopStates
 
-def controlLoopLTV(plot, useGP, onlineCovar, writeTraces, T, N, simRes, car_control_model, car_sim_model, stateTrajRef0, controlTrajRef0, stateCovarTrajRef0, x0, y0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y, stateTrajFile = [], controlTrajFile = []):  
+def controlLoopLTV(plot, useGP, onlineCovar, prstlEpsilon, writeTraces, T, N, simRes, car_control_model, car_sim_model, stateTrajRef0, controlTrajRef0, stateCovarTrajRef0, x0, y0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y, stateTrajFile = [], controlTrajFile = [], solveTimeFile = []):  
     car_sim_model.setInitialState(x0, y0, steerAng0, v0, carAng0)
 
     stateVector = np.array([x0, y0, steerAng0, v0, carAng0])
@@ -1314,6 +1310,7 @@ def controlLoopLTV(plot, useGP, onlineCovar, writeTraces, T, N, simRes, car_cont
     controlTrajRef = controlTrajRef0
     stateCovarTrajRef = stateCovarTrajRef0
     
+    solveTimes = []
     totalSolveTime = 0
     maxSolveTime = 0
 
@@ -1327,10 +1324,11 @@ def controlLoopLTV(plot, useGP, onlineCovar, writeTraces, T, N, simRes, car_cont
         stateTraj = []
         controlTraj = []
         feasible = False
-        solveTime, feasible, stateTraj, controlTraj, stateCovarTraj = solveLTV(False, onlineCovar, T-i*(T/N), N-i, car_control_model, stateTrajRef, controlTrajRef, stateCovarTrajRef, stateVector[0], stateVector[1], stateVector[2], stateVector[3], stateVector[4], goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y)
+        solveTime, feasible, stateTraj, controlTraj, stateCovarTraj = solveLTV(False, onlineCovar, prstlEpsilon, T-i*(T/N), N-i, car_control_model, stateTrajRef, controlTrajRef, stateCovarTrajRef, stateVector[0], stateVector[1], stateVector[2], stateVector[3], stateVector[4], goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y)
         
         num_iters += 1 
         totalSolveTime += solveTime
+        solveTimes += [solveTime]
         if solveTime > maxSolveTime:
             maxSolveTime = solveTime
 
@@ -1390,6 +1388,9 @@ def controlLoopLTV(plot, useGP, onlineCovar, writeTraces, T, N, simRes, car_cont
         for i in range(closedLoopControlTraj.shape[0]):
             controlTrajFile.write(str(closedLoopControlTraj[i, 0]) + "," + str(closedLoopControlTraj[i, 1]) + "\n")
         controlTrajFile.write("~\n")
+        for i in range(len(solveTimes)):
+            solveTimeFile.write(str(solveTimes[i]) + "\n")
+        solveTimeFile.write("~\n")
 
     return avgSolveTime, maxSolveTime, totalSolveTime, num_iters, feasible, closedLoopControlTraj, closedLoopPredictedStates, closedLoopStates
 
@@ -1445,7 +1446,7 @@ def controlLoopSetpoint(plot, T, N, simRes, car_control_model, car_sim_model, x0
 
     return closedLoopControlTraj, closedLoopStates
 
-def controlLoop(plot, controlCost, writeTraces, T, N, simRes, car_control_model, car_sim_model, x0, y0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y, stateTrajFile = [], controlTrajFile = []):
+def controlLoop(plot, controlCost, writeTraces, T, N, simRes, car_control_model, car_sim_model, x0, y0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y, stateTrajFile = [], controlTrajFile = [], solveTimeFile = []):
     dT = T/N
 
     car_sim_model.setInitialState(x0, y0, steerAng0, v0, carAng0)
@@ -1458,6 +1459,7 @@ def controlLoop(plot, controlCost, writeTraces, T, N, simRes, car_control_model,
     closedLoopControlTraj = []
     closedLoopPredictedStates = [stateVector]
 
+    solveTimes = []
     totalSolveTime = 0
     maxSolveTime = 0
 
@@ -1475,6 +1477,7 @@ def controlLoop(plot, controlCost, writeTraces, T, N, simRes, car_control_model,
 
         numIters += 1
         totalSolveTime += solveTime
+        solveTimes += [solveTime]
         if solveTime > maxSolveTime:
             maxSolveTime = solveTime
 
@@ -1529,6 +1532,9 @@ def controlLoop(plot, controlCost, writeTraces, T, N, simRes, car_control_model,
         for i in range(closedLoopControlTraj.shape[0]):
             controlTrajFile.write(str(closedLoopControlTraj[i, 0]) + "," + str(closedLoopControlTraj[i, 1]) + "\n")
         controlTrajFile.write("~\n")
+        for i in range(len(solveTimes)):
+            solveTimeFile.write(str(solveTimes[i]) + "\n")
+        solveTimeFile.write("~\n")
 
     return avgSolveTime, maxSolveTime, totalSolveTime, numIters, feasible, closedLoopControlTraj, closedLoopPredictedStates, closedLoopStates
 
@@ -1640,11 +1646,11 @@ car_GP_v_file.close()
 car_GP_carAng_file.close()
 #-----end GP load from file----#
 
-def testLoop(numRuns, start_x, start_y, goal_x, goal_y, obstacle_x, obstacle_y):    
+def testLoop(numRuns, stateTrace, controlTrace, solveTimeTrace, start_x, start_y, goal_x, goal_y, obstacle_x, obstacle_y):    
     totalSolveTimeLoopSmooth = 0
     numItersLoopSmooth = 0
     for i in range(numRuns):
-        avgSolveTime, maxSolveTime, totalSolvetime, numIters, feasible, _, _, stateTraj = controlLoop(False, False, True, T, N, simulation_resolution, car_sys, car_sim, start_x, start_y, steerAng0, vel0, Psi0, goal_x, goal_y, obstacle_x, obstacle_y, smoothOp_state_trace, smoothOp_control_trace)
+        avgSolveTime, maxSolveTime, totalSolvetime, numIters, feasible, _, _, stateTraj = controlLoop(False, False, True, T, N, simulation_resolution, car_sys, car_sim, start_x, start_y, steerAng0, vel0, Psi0, goal_x, goal_y, obstacle_x, obstacle_y, stateTrace, controlTrace, solveTimeTrace)
         totalSolveTimeLoopSmooth += totalSolvetime
         numItersLoopSmooth += numIters
 
@@ -1654,7 +1660,7 @@ def testLoop(numRuns, start_x, start_y, goal_x, goal_y, obstacle_x, obstacle_y):
 
     return avgSolveTime, maxSolveTime, totalSolveTimeLoopSmooth, numItersLoopSmooth
 
-def testLoopLTV(numRuns, onlineCovar, stateTrace, controlTrace, start_x, start_y, goal_x, goal_y, obstacle_x, obstacle_y):
+def testLoopLTV(numRuns, onlineCovar, prstlEpsilon, stateTrace, controlTrace, solveTimeTrace, start_x, start_y, goal_x, goal_y, obstacle_x, obstacle_y):
     car_sys.resetLTVstatus()
     totalSolveTimeLoopLTV = 0
     num_itersLoopLTV = 0
@@ -1662,7 +1668,7 @@ def testLoopLTV(numRuns, onlineCovar, stateTrace, controlTrace, start_x, start_y
         _, _, stateTrajRef, controlTrajRef = solveSetpointControl(False, T, N, car_sys, start_x, start_y, steerAng0, vel0, Psi0, 60, sy0, steerAng0, vel0, Psi0)
         
         stateCovarTrajRefSim = generateCovariancePredictions(T/N, 4, car_sys, stateTrajRef, controlTrajRef)
-        avgSolveTimeLTV, maxSolveTimeLTV, totalSolveTimeLTV, num_itersLTV, feasibleLTV, _, _, stateTraj = controlLoopLTV(False, True, onlineCovar, True, T, N, simulation_resolution, car_sys, car_sim, stateTrajRef, controlTrajRef, stateCovarTrajRefSim, start_x, start_y, steerAng0, vel0, Psi0, goal_x, goal_y, obstacle_x, obstacle_y, stateTrace, controlTrace)
+        avgSolveTimeLTV, maxSolveTimeLTV, totalSolveTimeLTV, num_itersLTV, feasibleLTV, _, _, stateTraj = controlLoopLTV(False, True, onlineCovar, prstlEpsilon, True, T, N, simulation_resolution, car_sys, car_sim, stateTrajRef, controlTrajRef, stateCovarTrajRefSim, start_x, start_y, steerAng0, vel0, Psi0, goal_x, goal_y, obstacle_x, obstacle_y, stateTrace, controlTrace, solveTimeTrace)
         
         totalSolveTimeLoopLTV += totalSolveTimeLTV
         num_itersLoopLTV += num_itersLTV
@@ -1675,14 +1681,14 @@ def testLoopLTV(numRuns, onlineCovar, stateTrace, controlTrace, start_x, start_y
 
     return avgSolveTimeLTV, maxSolveTimeLTV, totalSolveTimeLoopLTV, num_itersLoopLTV
 
-def testLoopNomLTV(numRuns, start_x, start_y, goal_x, goal_y, obstacle_x, obstacle_y):
+def testLoopNomLTV(numRuns, stateTrace, controlTrace, solveTimeTrace, start_x, start_y, goal_x, goal_y, obstacle_x, obstacle_y):
     car_sys.resetLTVstatus()
     totalSolveTimeLoopNomLTV = 0
     num_itersLoopNomLTV = 0
     for i in range(numRuns):
         _, _, stateTrajRef, controlTrajRef = solveSetpointControl(False, T, N, car_sys, start_x, start_y, steerAng0, vel0, Psi0, 60, sy0, steerAng0, vel0, Psi0)
        
-        avgSolveTimeNomLTV, maxSolveTimeNomLTV, totalSolveTimeNomLTV, num_itersNomLTV, feasibleNomLTV, _, _, stateTraj = controlLoopNomLTV(False, True, T, N, simulation_resolution, car_sys, car_sim, stateTrajRef, controlTrajRef, start_x, start_y, steerAng0, vel0, Psi0, goal_x, goal_y, obstacle_x, obstacle_y, nom_state_trace, nom_control_trace)
+        avgSolveTimeNomLTV, maxSolveTimeNomLTV, totalSolveTimeNomLTV, num_itersNomLTV, feasibleNomLTV, _, _, stateTraj = controlLoopNomLTV(False, True, T, N, simulation_resolution, car_sys, car_sim, stateTrajRef, controlTrajRef, start_x, start_y, steerAng0, vel0, Psi0, goal_x, goal_y, obstacle_x, obstacle_y, stateTrace, controlTrace, solveTimeTrace)
         
         totalSolveTimeLoopNomLTV += totalSolveTimeNomLTV
         num_itersLoopNomLTV += num_itersNomLTV
@@ -1724,64 +1730,79 @@ smallObstacleRho = 0.25 #Since system is treated as discrete, even though discre
                         #Add small buffer around obstacle to remove this effect. (in effect, the obstacle "seen" by the controller is bigger
                         #than the displayed obstacle). 
 
+prstlEpsilon = 0.3
+
+# smoothOp_state_trace = open("./trace_data/autocar_state_traces_smoothOp.txt", "w")
+# smoothOp_control_trace = open("./trace_data/autocar_control_traces_smoothOp.txt", "w")
+# smoothOp_solveTime_trace = open("./trace_data/autocar_solveTime_traces_smoothOp.txt", "w")
+# LTVGP_state_trace = open("./trace_data/autocar_state_trace_LTVGP.txt", "w")
+# LTVGP_control_trace = open("./trace_data/autocar_control_trace_LTVGP.txt", "w")
+# LTVGP_solveTime_trace = open("./trace_data/autocar_solveTime_traces_LTVGP.txt", "w")
+LTVGP_state_trace_offlineCovar = open("./trace_data/autocar_state_trace_LTVGP_offlineCovar_eps"+str(prstlEpsilon)+".txt", "w")
+LTVGP_control_trace_offlineCovar = open("./trace_data/autocar_control_trace_LTVGP_offlineCovar_eps"+str(prstlEpsilon)+".txt", "w")
+LTVGP_solveTime_trace_offlineCovar = open("./trace_data/autocar_solveTime_traces_LTVGP_offlineCovar_eps"+str(prstlEpsilon)+".txt", "w")
+# nom_state_trace = open("./trace_data/autocar_state_trace_nom.txt", "w")
+# nom_control_trace = open("./trace_data/autocar_control_trace_nom.txt", "w")
+# nom_solveTime_trace = open("./trace_data/autocar_solveTime_traces_nom.txt", "w")
+
 totalTimeNomLTV = 0
 totalNumItersNomLTV = 0
-for config in configs:
-    goal_x = [config, 100]
-    goal_y = [0, 3] 
-    obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
-    obstacle_y = [0, 3 + smallObstacleRho]
-    for i in range(numStartPositions):
-        x_init = start_x[i]
-        y_init = start_y[i]
+# for config in configs:
+#     goal_x = [config, 100]
+#     goal_y = [0, 3] 
+#     obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
+#     obstacle_y = [0, 3 + smallObstacleRho]
+#     for i in range(numStartPositions):
+#         x_init = start_x[i]
+#         y_init = start_y[i]
 
-        avgTimeNomLTV, maxTimeNomLTV, oneLoopTotalTimeNomLTV, oneLoopNumItersNomLTV = testLoopNomLTV(numberTrials, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
+#         avgTimeNomLTV, maxTimeNomLTV, oneLoopTotalTimeNomLTV, oneLoopNumItersNomLTV = testLoopNomLTV(numberTrials, nom_state_trace, nom_control_trace, nom_solveTime_trace, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
 
-        totalTimeNomLTV += oneLoopTotalTimeNomLTV 
-        totalNumItersNomLTV += oneLoopNumItersNomLTV
+#         totalTimeNomLTV += oneLoopTotalTimeNomLTV 
+#         totalNumItersNomLTV += oneLoopNumItersNomLTV
 
-        avgTimeNomLTVList += [avgTimeNomLTV]
-        maxTimeNomLTVList += [maxTimeNomLTV]
+#         avgTimeNomLTVList += [avgTimeNomLTV]
+#         maxTimeNomLTVList += [maxTimeNomLTV]
 
 
 totalTimeSmooth = 0
 totalNumItersSmooth = 0
-for config in configs:
-    goal_x = [config, 100]
-    goal_y = [0, 3] 
-    obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
-    obstacle_y = [0, 3 + smallObstacleRho]
+# for config in configs:
+#     goal_x = [config, 100]
+#     goal_y = [0, 3] 
+#     obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
+#     obstacle_y = [0, 3 + smallObstacleRho]
 
-    for i in range(numStartPositions):
-        x_init = start_x[i]
-        y_init = start_y[i]
+#     for i in range(numStartPositions):
+#         x_init = start_x[i]
+#         y_init = start_y[i]
 
-        avgTimeSmooth, maxTimeSmooth, oneLoopSolveTime, oneLoopNumIters = testLoop(numberTrials, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
+#         avgTimeSmooth, maxTimeSmooth, oneLoopSolveTime, oneLoopNumIters = testLoop(numberTrials, smoothOp_state_trace, smoothOp_control_trace, smoothOp_solveTime_trace, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
 
-        totalTimeSmooth += oneLoopSolveTime
-        totalNumItersSmooth += oneLoopNumIters
+#         totalTimeSmooth += oneLoopSolveTime
+#         totalNumItersSmooth += oneLoopNumIters
 
-        avgTimeSmoothList += [avgTimeSmooth]
-        maxTimeSmoothList += [maxTimeSmooth]
+#         avgTimeSmoothList += [avgTimeSmooth]
+#         maxTimeSmoothList += [maxTimeSmooth]
 
-totalTimeLTV = 0
-totalNumItersLTV = 0
-for config in configs:
-    goal_x = [config, 100]
-    goal_y = [0, 3] 
-    obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
-    obstacle_y = [0, 3 + smallObstacleRho]
-    for i in range(numStartPositions):
-        x_init = start_x[i]
-        y_init = start_y[i]
+# totalTimeLTV = 0
+# totalNumItersLTV = 0
+# for config in configs:
+#     goal_x = [config, 100]
+#     goal_y = [0, 3] 
+#     obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
+#     obstacle_y = [0, 3 + smallObstacleRho]
+#     for i in range(numStartPositions):
+#         x_init = start_x[i]
+#         y_init = start_y[i]
 
-        avgTimeLTV, maxTimeLTV, oneLoopTotalTimeLTV, oneLoopNumItersLTV = testLoopLTV(numberTrials, True, LTVGP_state_trace, LTVGP_control_trace, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
+#         avgTimeLTV, maxTimeLTV, oneLoopTotalTimeLTV, oneLoopNumItersLTV = testLoopLTV(numberTrials, True, LTVGP_state_trace, LTVGP_control_trace, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
 
-        totalTimeLTV += oneLoopTotalTimeLTV 
-        totalNumItersLTV += oneLoopNumItersLTV
+#         totalTimeLTV += oneLoopTotalTimeLTV 
+#         totalNumItersLTV += oneLoopNumItersLTV
 
-        avgTimeLTVList += [avgTimeLTV]
-        maxTimeLTVList += [maxTimeLTV]
+#         avgTimeLTVList += [avgTimeLTV]
+#         maxTimeLTVList += [maxTimeLTV]
     
 
 totalTimeLTV_offlineCovar = 0
@@ -1795,7 +1816,7 @@ for config in configs:
         x_init = start_x[i]
         y_init = start_y[i]
 
-        avgTimeLTV_offlineCovar, maxTimeLTV_offlineCovar, oneLoopTotalTimeLTV_offlineCovar, oneLoopNumItersLTV_offlineCovar = testLoopLTV(numberTrials, False, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
+        avgTimeLTV_offlineCovar, maxTimeLTV_offlineCovar, oneLoopTotalTimeLTV_offlineCovar, oneLoopNumItersLTV_offlineCovar = testLoopLTV(numberTrials, False, prstlEpsilon, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, LTVGP_solveTime_trace_offlineCovar, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
 
         totalTimeLTV_offlineCovar += oneLoopTotalTimeLTV_offlineCovar
         totalNumItersLTV_offlineCovar += oneLoopNumItersLTV_offlineCovar
@@ -1812,9 +1833,9 @@ totalAvgTimeSmooth = -1
 if totalNumItersSmooth > 0:
     totalAvgTimeSmooth = totalTimeSmooth/totalNumItersSmooth
 
-totalAvgTimeLTV = -1
-if totalNumItersLTV > 0: 
-    totalAvgTimeLTV = totalTimeLTV/totalNumItersLTV
+# totalAvgTimeLTV = -1
+# if totalNumItersLTV > 0: 
+#     totalAvgTimeLTV = totalTimeLTV/totalNumItersLTV
 
 totalAvgTimeLTVofflineCovar = -1
 if totalNumItersLTV_offlineCovar > 0:
@@ -1823,29 +1844,33 @@ if totalNumItersLTV_offlineCovar > 0:
 print("-----Avg time stat-----")
 print("Avg time Nom: ", totalAvgTimeNomLTV)
 print("Avg time smooth: ", totalAvgTimeSmooth)
-print("Avg time LTV: ", totalAvgTimeLTV)
+# print("Avg time LTV: ", totalAvgTimeLTV)
 print("Avg time LTV offline covar: ", totalAvgTimeLTVofflineCovar)
 
 print("-----num Iters debug-----")
 print("num iters Nom: ", totalNumItersNomLTV)
 print("num iters smooth: ", totalNumItersSmooth)
-print("num iters LTV: ", totalNumItersLTV)
+# print("num iters LTV: ", totalNumItersLTV)
 print("num iters LTV offline covar: ", totalNumItersLTV_offlineCovar)
 
 
 print("-----Max time stat-----")
 print("Max time Nom: ", maxTimeNomLTVList)
 print("Max time smooth: ", maxTimeSmoothList)
-print("Max time LTV: ", maxTimeLTVList)
+# print("Max time LTV: ", maxTimeLTVList)
 print("Max time LTV offline covar: ", maxTimeLTVList_offlineCovar)
 
-smoothOp_state_trace.close()
-smoothOp_control_trace.close()
-LTVGP_state_trace.close()
-LTVGP_control_trace.close()
+# smoothOp_state_trace.close()
+# smoothOp_control_trace.close()
+# smoothOp_solveTime_trace.close()
+# LTVGP_state_trace.close()
+# LTVGP_control_trace.close()
+# LTVGP_solveTime_trace.close()
 LTVGP_state_trace_offlineCovar.close()
 LTVGP_control_trace_offlineCovar.close()
-nom_state_trace.close()
-nom_control_trace.close()
+LTVGP_solveTime_trace_offlineCovar.close()
+# nom_state_trace.close()
+# nom_control_trace.close()
+# nom_solveTime_trace.close()
 
 plt.show()

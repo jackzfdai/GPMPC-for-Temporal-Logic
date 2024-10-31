@@ -6,13 +6,6 @@ from casadi import *
 
 import cstr_model as cstr
 
-smoothOp_state_trace_file = open("./trace_data/cstr_30x30_state_traces_smoothOp.txt", "w")
-smoothOp_control_trace_file = open("./trace_data/cstr_30x30_control_traces_smoothOp.txt", "w")
-GP_state_trace_file = open("./trace_data/cstr_30x30_state_traces_GP.txt", "w")
-GP_control_trace_file = open("./trace_data/cstr_30x30_control_traces_GP.txt", "w")
-Nom_state_trace_file = open("./trace_data/cstr_30x30_state_traces_nom.txt", "w")
-Nom_control_trace_file = open("./trace_data/cstr_30x30_control_traces_nom.txt", "w")
-
 cstr_paramD = 0.078
 cstr_paramB = 8
 cstr_paramGamma = 20
@@ -178,7 +171,7 @@ def controlToSetPoint(plot, T, N, cstr, x1_0, x2_0, setpoint, controlEffortCost,
 
     return proc_runtime, feasible, state_opt, control_opt
 
-def solveMINLP(plot, T, N, cstr, x1_0, x2_0, xCovar0, addGP, referenceVarTraj = None, referenceControlTraj = None):
+def solveMINLP(plot, T, N, cstr, x1_0, x2_0, xCovar0, addGP, prstlEpsilon = 0.1, referenceVarTraj = None, referenceControlTraj = None):
     feasible = False
     proc_runtime = 0
     state_opt = []
@@ -221,8 +214,9 @@ def solveMINLP(plot, T, N, cstr, x1_0, x2_0, xCovar0, addGP, referenceVarTraj = 
     lbbin = [0]
     ubbin = [1]
 
-    invCDFVarphiEpsilon = norm.ppf(0.15)
-    smallEps = 1e-9
+    if addGP:
+        invCDFVarphiEpsilon = norm.ppf(prstlEpsilon)
+    smallEps = 5e-9
 
     x_init = [x1_0, x2_0]
     xcovar_init_zero = np.fmax([0]*stateCovarLen, stateCovarLowerLim)
@@ -602,12 +596,13 @@ def solveSmoothRobustness(plot, T, N, cstr, x1_0, x2_0, referenceVarTraj = None,
 
     return proc_runtime, feasible, state_opt, control_opt
 
-def controlLoop(plot, individual_plot, writeTraces, specificationController, T, N, cstr_control_model, cstr_sim_model, x1_0, x2_0, controller, controllerExtraParams=(), stateTrajFile=[], controlTrajFile=[]):
+def controlLoop(plot, individual_plot, writeTraces, specificationController, T, N, cstr_control_model, cstr_sim_model, x1_0, x2_0, controller, controllerExtraParams=(), stateTrajFile=[], controlTrajFile=[], solveTimeFile = []):
     dT = T/N
     simRes = 0.005
     
     maxSolveTime = 0
     totalSolveTime = 0
+    solveTimes = []
 
     cstr_sim_model.initState(x1_0, x2_0)
     stateVector = np.array([x1_0, x2_0])
@@ -638,6 +633,7 @@ def controlLoop(plot, individual_plot, writeTraces, specificationController, T, 
         num_iters += 1
 
         totalSolveTime += solveTime
+        solveTimes += [solveTime]
         if solveTime > maxSolveTime:
             maxSolveTime = solveTime
 
@@ -688,6 +684,9 @@ def controlLoop(plot, individual_plot, writeTraces, specificationController, T, 
         for i in range(closedLoopControls.shape[0]):
             controlTrajFile.write(str(closedLoopControls[i, 0]) + "\n")
         controlTrajFile.write("~\n")
+        for i in range(len(solveTimes)):
+            solveTimeFile.write(str(solveTimes[i]) + "\n")
+        solveTimeFile.write("~\n")
 
     return recursivelyFeasible, averageSolveTime, maxSolveTime, totalSolveTime, num_iters, manualCost, closedLoopControls, closedLoopPredictedStates, closedLoopStates
 
@@ -775,9 +774,22 @@ while len(x1_0_configs) < numConfigs :
         x1_0_configs += [x1_0_candidate]
         x2_0_configs += [x2_0_candidate]
 
-totalCostSmoothOpList = []
-totalCostGPList = []
-totalCostNomList = []
+prstlEpsilon = 0.01
+
+# smoothOp_state_trace_file = open("./trace_data/cstr_30x30_state_traces_smoothOp.txt", "w")
+# smoothOp_control_trace_file = open("./trace_data/cstr_30x30_control_traces_smoothOp.txt", "w")
+# smoothOp_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_smoothOp.txt", "w")
+GP_state_trace_file = open("./trace_data/cstr_30x30_state_traces_GP_eps"+str(prstlEpsilon)+".txt", "w")
+GP_control_trace_file = open("./trace_data/cstr_30x30_control_traces_GP_eps"+str(prstlEpsilon)+".txt", "w")
+GP_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_GP_eps"+str(prstlEpsilon)+".txt", "w")
+# Nom_state_trace_file = open("./trace_data/cstr_30x30_state_traces_nom.txt", "w")
+# Nom_control_trace_file = open("./trace_data/cstr_30x30_control_traces_nom.txt", "w")
+# Nom_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_nom.txt", "w")
+
+
+# totalCostSmoothOpList = []
+# totalCostGPList = []
+# totalCostNomList = []
 
 maxSolveTimeSmoothOpList = []
 maxSolveTimeGPList = []
@@ -791,54 +803,64 @@ totalItersSmoothOp = 0
 totalItersGp = 0
 totalItersNom = 0
 
+# for i in range(numConfigs):
+#     x1_0_i = x1_0_configs[i]
+#     x2_0_i = x2_0_configs[i]
+
+#     satSmoothOp = 0
+#     totalCostSmoothOp = 0
+#     maxSolveTimeForConfigSmoothOp = 0
+
+#     for j in range(numTrials):
+#         recursiveFeasibilitySmoothOp, avgSolveTimeSmoothOp, maxSolveTimeSmoothOp, totalSolveTimeSmoothOp, itersCompletedSmoothOp, costSmoothOp, _, _, stateTrajSmoothOp = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveSmoothRobustness, (), smoothOp_state_trace_file, smoothOp_control_trace_file, smoothOp_solveTime_trace_file)
+#         bigTotalTimeSmoothOp += totalSolveTimeSmoothOp
+#         totalItersSmoothOp += itersCompletedSmoothOp
+        
+#         if maxSolveTimeSmoothOp > maxSolveTimeForConfigSmoothOp:
+#             maxSolveTimeForConfigSmoothOp = maxSolveTimeSmoothOp
+
+#     # totalCostSmoothOpList += [totalCostSmoothOp]
+#     maxSolveTimeSmoothOpList += [maxSolveTimeForConfigSmoothOp]
+
 for i in range(numConfigs):
     x1_0_i = x1_0_configs[i]
     x2_0_i = x2_0_configs[i]
-
-    satSmoothOp = 0
+    
     satGP = 0
-    satNom = 0
-
-    totalCostSmoothOp = 0
     totalCostGP = 0
-    totalCostNom = 0
-
-    maxSolveTimeForConfigSmoothOp = 0
     maxSolveTimeForConfigGP = 0
-    maxSolveTimeForConfigNom = 0
 
     for j in range(numTrials):
-        recursiveFeasibilitySmoothOp, avgSolveTimeSmoothOp, maxSolveTimeSmoothOp, totalSolveTimeSmoothOp, itersCompletedSmoothOp, costSmoothOp, _, _, stateTrajSmoothOp = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveSmoothRobustness, (), smoothOp_state_trace_file, smoothOp_control_trace_file,)
-        bigTotalTimeSmoothOp += totalSolveTimeSmoothOp
-        totalItersSmoothOp += itersCompletedSmoothOp
-        
-        if maxSolveTimeSmoothOp > maxSolveTimeForConfigSmoothOp:
-            maxSolveTimeForConfigSmoothOp = maxSolveTimeSmoothOp
-
         useGP = True
-        recursiveFeasibilityGP, avgSolveTimeGP, maxSolveTimeGP, totalSolveTimeGP, itersCompletedGP, costGP, _, _, stateTrajGP = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveMINLP, (xCovar0, useGP), GP_state_trace_file, GP_control_trace_file)
+        recursiveFeasibilityGP, avgSolveTimeGP, maxSolveTimeGP, totalSolveTimeGP, itersCompletedGP, costGP, _, _, stateTrajGP = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveMINLP, (xCovar0, useGP, prstlEpsilon), GP_state_trace_file, GP_control_trace_file, GP_solveTime_trace_file)
         bigTotalTimeGP += totalSolveTimeGP
         totalItersGp += itersCompletedGP
         
         if maxSolveTimeGP > maxSolveTimeForConfigGP:
             maxSolveTimeForConfigGP = maxSolveTimeGP
-
-        useGP = False
-        recursiveFeasibilityNom, avgSolveTimeNom, maxSolveTimeNom, totalSolveTimeNom, itersCompletedNom, costNom, _, _, stateTrajNom = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveMINLP, (xCovar0, useGP), Nom_state_trace_file, Nom_control_trace_file)
-        bigTotalTimeNom += totalSolveTimeNom
-        totalItersNom += itersCompletedNom
-        
-        if maxSolveTimeNom > maxSolveTimeForConfigNom:
-            maxSolveTimeForConfigNom = maxSolveTimeNom
-
     
-    totalCostSmoothOpList += [totalCostSmoothOp]
-    totalCostGPList += [totalCostGP]
-    totalCostNomList += [totalCostNom]
-
-    maxSolveTimeSmoothOpList += [maxSolveTimeForConfigSmoothOp]
+    # totalCostGPList += [totalCostGP]
     maxSolveTimeGPList += [maxSolveTimeForConfigGP]
-    maxSolveTimeNomList += [maxSolveTimeForConfigNom]
+
+# for i in range(numConfigs):
+#     x1_0_i = x1_0_configs[i]
+#     x2_0_i = x2_0_configs[i]
+
+#     satNom = 0
+#     totalCostNom = 0
+#     maxSolveTimeForConfigNom = 0
+
+#     for j in range(numTrials):
+#         useGP = False
+#         recursiveFeasibilityNom, avgSolveTimeNom, maxSolveTimeNom, totalSolveTimeNom, itersCompletedNom, costNom, _, _, stateTrajNom = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveMINLP, (xCovar0, useGP), Nom_state_trace_file, Nom_control_trace_file, Nom_solveTime_trace_file)
+#         bigTotalTimeNom += totalSolveTimeNom
+#         totalItersNom += itersCompletedNom
+        
+#         if maxSolveTimeNom > maxSolveTimeForConfigNom:
+#             maxSolveTimeForConfigNom = maxSolveTimeNom
+
+#     # totalCostNomList += [totalCostNom]
+#     maxSolveTimeNomList += [maxSolveTimeForConfigNom]
 
 print("-----initial states-----")
 print("x1: ", x1_0_configs)
@@ -871,11 +893,14 @@ print("Smooth Op: ", totalItersSmoothOp)
 print("GP: ", totalItersGp)
 print("Nom: ", totalItersNom)
 
-smoothOp_state_trace_file.close()
-smoothOp_control_trace_file.close()
+# smoothOp_state_trace_file.close()
+# smoothOp_control_trace_file.close()
+# smoothOp_solveTime_trace_file.close()
 GP_state_trace_file.close()
 GP_control_trace_file.close()
-Nom_state_trace_file.close()
-Nom_control_trace_file.close()
+GP_solveTime_trace_file.close()
+# Nom_state_trace_file.close()
+# Nom_control_trace_file.close()
+# Nom_solveTime_trace_file.close()
 
 plt.show()

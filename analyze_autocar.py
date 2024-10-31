@@ -55,6 +55,8 @@ obstacle_y = [0, 3]
 goal_min_speed = 15
 goal_carAng = [-1/20*math.pi, 1/20*math.pi]
 
+prstlEpsilon = 0.3
+
 bigMx = xlim[1] - xlim[0] + 1
 bigMy = ylim[1] - ylim[0] + 1
 bigMv = vlim[1] - vlim[0] + 1
@@ -84,10 +86,9 @@ def getInitialStates(stateTraceFile):
 
     return initialStates
 
-def getTracesFor(init_x, init_y, stateTraceFile, controlTraceFile):
+def getTracesFor(init_x, init_y, stateTraceFile, controlTraceFile = None, solveTimeTraceFile = None):
     stateTraceFile.seek(0)
-    controlTraceFile.seek(0)
-
+    
     stateTraces = []
     stateTrace = []
     for line in stateTraceFile:
@@ -109,29 +110,51 @@ def getTracesFor(init_x, init_y, stateTraceFile, controlTraceFile):
 
     controlTrace = []
     controlTraces = []
-    for line in controlTraceFile:
-        if line == "~\n":
-            controlTrajectory = np.array([])
-            if len(controlTrace) > 0:
-                controlTrajectory = np.vstack(controlTrace)
-            controlTraces += [controlTrajectory]
-            controlTrace = []
-        else: 
-            lineElements = line.split(",")
-            u1 = float(lineElements[0])
-            u2 = float(lineElements[1].split("\n")[0])
-            controlTrace += [np.array([u1, u2])] 
+    if controlTraceFile is not None:
+        controlTraceFile.seek(0)
+        for line in controlTraceFile:
+            if line == "~\n":
+                controlTrajectory = np.array([])
+                if len(controlTrace) > 0:
+                    controlTrajectory = np.vstack(controlTrace)
+                controlTraces += [controlTrajectory]
+                controlTrace = []
+            else: 
+                lineElements = line.split(",")
+                u1 = float(lineElements[0])
+                u2 = float(lineElements[1].split("\n")[0])
+                controlTrace += [np.array([u1, u2])] 
+
+    solveTimeTrace = []
+    solveTimeTraces = []
+    if solveTimeTraceFile is not None:
+        solveTimeTraceFile.seek(0)
+
+        for line in solveTimeTraceFile:
+            if line == "~\n":
+                if len(solveTimeTrace) > 0:
+                    solveTimeTraces += [np.vstack(solveTimeTrace)]
+                else:
+                    solveTimeTraces += [np.array([])]
+            else:
+                solveTime = float(line.split("\n")[0])
+                solveTimeTrace += [np.array([solveTime])] 
 
     targetStateTraces = []
     targetControlTraces = []
+    targetSolveTimeTraces = []
     for i in range(len(stateTraces)):
         stateTrace = stateTraces[i]
         if stateTrace.size > 0 and stateTrace[0, 0] == init_x and stateTrace[0, 1] == init_y:
-            controlTrace = controlTraces[i]
+            if len(controlTraces) > 0:
+                controlTrace = controlTraces[i]
+                targetControlTraces += [controlTrace]
+            if len(solveTimeTraces) > 0:
+                solveTimeTrace = solveTimeTraces[i]
+                targetSolveTimeTraces += [solveTimeTrace]
             targetStateTraces += [stateTrace]
-            targetControlTraces += [controlTrace]
     
-    return targetStateTraces, targetControlTraces
+    return targetStateTraces, targetControlTraces, targetSolveTimeTraces
 
 def plotSol(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_GP_offlineCovar = [], u_GP_offlineCovar = [], x_Nom = [], u_Nom = [], goal_A_polygon_x = [], goal_A_polygon_y = [], obstacle_polygon_x = [], obstacle_polygon_y = []):
     params = {'mathtext.default': 'regular',
@@ -253,20 +276,19 @@ def plotAllSol(N, plotControlTraj, stateTraceFileSmoothOp, controlTraceFileSmoot
     initialStatesGP = getInitialStates(stateTraceFileGP)
     initialStatesNom = getInitialStates(stateTraceFileNom)
     for initialState in initialStatesSmoothOp:
-        stateTracesSmoothOp, controlTracesSmoothOp = getTracesFor(initialState[0], initialState[1], stateTraceFileSmoothOp, controlTraceFileSmoothOp)
-        stateTracesGP, controlTracesGP = getTracesFor(initialState[0], initialState[1], stateTraceFileGP, controlTraceFileGP)
-        stateTraceGPofflineCovar, controlTraceGPofflineCovar = getTracesFor(initialState[0], initialState[1], stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar)
-        stateTracesNom, controlTracesNom = getTracesFor(initialState[0], initialState[1], stateTraceFileNom, controlTraceFileNom)
+        stateTracesSmoothOp, controlTracesSmoothOp, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileSmoothOp, controlTraceFileSmoothOp)
+        stateTracesGP, controlTracesGP, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileGP, controlTraceFileGP)
+        stateTraceGPofflineCovar, controlTraceGPofflineCovar, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar)
+        stateTracesNom, controlTracesNom, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileNom, controlTraceFileNom)
         plotSol(N, plotControlTraj, stateTracesSmoothOp, controlTracesSmoothOp, stateTracesGP, controlTracesGP, stateTraceGPofflineCovar, controlTraceGPofflineCovar, stateTracesNom, controlTracesNom, goal_x, goal_y, obstacle_x, obstacle_y)
 
-def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_GP_offlineCovar = [], u_GP_offlineCovar = [], x_Nom = [], u_Nom = [], goal_A_polygon_x = [], goal_A_polygon_y = [], obstacle_polygon_x = [], obstacle_polygon_y = []):
+def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP_offlineCovar = [], u_GP_offlineCovar = [], x_Nom = [], u_Nom = [], goal_A_polygon_x = [], goal_A_polygon_y = [], obstacle_polygon_x = [], obstacle_polygon_y = []):
     params = {'mathtext.default': 'regular',
               'pdf.fonttype' : 42 }          
     plt.rcParams.update(params)
     nom_plotIdx = 0
     smoothOp_plotIdx = 1
-    GP_plotIdx = 2
-    GP_offlineCovar_plotIdx = 3
+    GP_offlineCovar_plotIdx = 2
     
     fig, ax = plt.subplots(3, 1, constrained_layout=True)
 
@@ -288,15 +310,10 @@ def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP =
         ax[smoothOp_plotIdx].fill(obstacle_polygon_x_plot, obstacle_polygon_y_plot, 'lightslategray', alpha=0.5)
         ax[smoothOp_plotIdx].plot(obstacle_polygon_x_plot + [obstacle_polygon_x[0]], obstacle_polygon_y_plot + [obstacle_polygon_y[1]], 'lightslategray')
 
-        ax[GP_plotIdx].fill(goal_A_polygon_x_plot, goal_A_polygon_y_plot, 'g', alpha=0.5)
-        ax[GP_plotIdx].plot(goal_A_polygon_x_plot + [goal_A_polygon_x[0]], goal_A_polygon_y_plot + [goal_A_polygon_y[1]], 'g')
-        ax[GP_plotIdx].fill(obstacle_polygon_x_plot, obstacle_polygon_y_plot, 'lightslategray', alpha=0.5)
-        ax[GP_plotIdx].plot(obstacle_polygon_x_plot + [obstacle_polygon_x[0]], obstacle_polygon_y_plot + [obstacle_polygon_y[1]], 'lightslategray')
-
-        # ax[GP_offlineCovar_plotIdx].fill(goal_A_polygon_x_plot, goal_A_polygon_y_plot, 'g', alpha=0.5)
-        # ax[GP_offlineCovar_plotIdx].plot(goal_A_polygon_x_plot + [goal_A_polygon_x[0]], goal_A_polygon_y_plot + [goal_A_polygon_y[1]], 'g')
-        # ax[GP_offlineCovar_plotIdx].fill(obstacle_polygon_x_plot, obstacle_polygon_y_plot, 'lightslategray', alpha=0.5)
-        # ax[GP_offlineCovar_plotIdx].plot(obstacle_polygon_x_plot + [obstacle_polygon_x[0]], obstacle_polygon_y_plot + [obstacle_polygon_y[1]], 'lightslategray')
+        ax[GP_offlineCovar_plotIdx].fill(goal_A_polygon_x_plot, goal_A_polygon_y_plot, 'g', alpha=0.5)
+        ax[GP_offlineCovar_plotIdx].plot(goal_A_polygon_x_plot + [goal_A_polygon_x[0]], goal_A_polygon_y_plot + [goal_A_polygon_y[1]], 'g')
+        ax[GP_offlineCovar_plotIdx].fill(obstacle_polygon_x_plot, obstacle_polygon_y_plot, 'lightslategray', alpha=0.5)
+        ax[GP_offlineCovar_plotIdx].plot(obstacle_polygon_x_plot + [obstacle_polygon_x[0]], obstacle_polygon_y_plot + [obstacle_polygon_y[1]], 'lightslategray')
 
         ax[nom_plotIdx].fill(goal_A_polygon_x_plot, goal_A_polygon_y_plot, 'g', alpha=0.5)
         ax[nom_plotIdx].plot(goal_A_polygon_x_plot + [goal_A_polygon_x[0]], goal_A_polygon_y_plot + [goal_A_polygon_y[1]], 'g')
@@ -313,25 +330,15 @@ def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP =
         ax[smoothOp_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=smoothOp_color)
     ax[smoothOp_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
 
-    ax[GP_plotIdx].set_xlim(xlim[0], xlim[1])
-    ax[GP_plotIdx].set_ylim(ylim[0], ylim[1])
-    ax[GP_plotIdx].set_xlabel('$s_x\, (m)$')
-    ax[GP_plotIdx].set_ylabel('$s_y\, (m)$')
-    ax[GP_plotIdx].text(controller_label_x, controller_label_y, 'LRi-A', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
+    ax[GP_offlineCovar_plotIdx].set_xlim(xlim[0], xlim[1])
+    ax[GP_offlineCovar_plotIdx].set_ylim(ylim[0], ylim[1])
+    ax[GP_offlineCovar_plotIdx].set_xlabel('$s_x\, (m)$')
+    ax[GP_offlineCovar_plotIdx].set_ylabel('$s_y\, (m)$')
+    ax[GP_offlineCovar_plotIdx].text(controller_label_x, controller_label_y, 'LRi-A', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
 
-    for traj in x_GP:
-        ax[GP_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=lri_color)
-    ax[GP_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
-
-    # ax[GP_offlineCovar_plotIdx].set_xlim(xlim[0], xlim[1])
-    # ax[GP_offlineCovar_plotIdx].set_ylim(ylim[0], ylim[1])
-    # ax[GP_offlineCovar_plotIdx].set_xlabel('$s_x\, (m)$')
-    # ax[GP_offlineCovar_plotIdx].set_ylabel('$s_y\, (m)$')
-    # ax[GP_offlineCovar_plotIdx].text(controller_label_x, controller_label_y, 'LLRi-PC', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
-
-    # for traj in x_GP_offlineCovar:
-    #     ax[GP_offlineCovar_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=lri_color)
-    # ax[GP_offlineCovar_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
+    for traj in x_GP_offlineCovar:
+        ax[GP_offlineCovar_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=lri_color)
+    ax[GP_offlineCovar_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
 
     ax[nom_plotIdx].set_xlim(xlim[0], xlim[1])
     ax[nom_plotIdx].set_ylim(ylim[0], ylim[1])
@@ -361,29 +368,21 @@ def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP =
             nom_vSteerAng, = ax_u[vSteerAngIdx].plot(tgrid, controlTraj[:,0], '-o', alpha=0.5, linewidth=1, label="Nominal", color="steelblue")
             nom_accel, = ax_u[accelIdx].plot(tgrid, controlTraj[:, 1], '-o', alpha=0.5, linewidth=1, label="Nominal", color="steelblue")
             
-        for controlTraj in u_GP:
-            tgrid = [k for k in range(len(controlTraj))]
-            gp_vSteerAng, = ax_u[vSteerAngIdx].plot(tgrid, controlTraj[:,0], '-o', alpha=0.5, linewidth=1, label="GP", color="purple")
-            gp_accel, = ax_u[accelIdx].plot(tgrid, controlTraj[:, 1], '-o', alpha=0.5, linewidth=1, label="GP", color="purple")
-
         for controlTraj in u_GP_offlineCovar:
             tgrid = [k for k in range(len(controlTraj))]
             gpOfflineCovar_vSteerAng, = ax_u[vSteerAngIdx].plot(tgrid, controlTraj[:,0], '-o', alpha=0.5, linewidth=1, label="GP (offlineCovar)", color="green")
             gpOfflineCovar_accel, = ax_u[accelIdx].plot(tgrid, controlTraj[:, 1], '-o', alpha=0.5, linewidth=1, label="GP (offlineCovar)", color="green")
 
-        ax_u[vSteerAngIdx].legend(handles=[nom_vSteerAng, gp_vSteerAng, gpOfflineCovar_vSteerAng])
-        ax_u[accelIdx].legend(handles=[nom_accel, gp_accel, gpOfflineCovar_accel])
+        ax_u[vSteerAngIdx].legend(handles=[nom_vSteerAng, gpOfflineCovar_vSteerAng])
+        ax_u[accelIdx].legend(handles=[nom_accel, gpOfflineCovar_accel])
 
-def plotAllSol1(N, plotControlTraj, stateTraceFileSmoothOp, controlTraceFileSmoothOp, stateTraceFileGP, controlTraceFileGP, stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar, stateTraceFileNom, controlTraceFileNom):
+def plotAllSol1(N, plotControlTraj, stateTraceFileSmoothOp, controlTraceFileSmoothOp, stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar, stateTraceFileNom, controlTraceFileNom):
     initialStatesSmoothOp = getInitialStates(stateTraceFileSmoothOp)
-    initialStatesGP = getInitialStates(stateTraceFileGP)
-    initialStatesNom = getInitialStates(stateTraceFileNom)
     for initialState in initialStatesSmoothOp:
-        stateTracesSmoothOp, controlTracesSmoothOp = getTracesFor(initialState[0], initialState[1], stateTraceFileSmoothOp, controlTraceFileSmoothOp)
-        stateTracesGP, controlTracesGP = getTracesFor(initialState[0], initialState[1], stateTraceFileGP, controlTraceFileGP)
-        stateTraceGPofflineCovar, controlTraceGPofflineCovar = getTracesFor(initialState[0], initialState[1], stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar)
-        stateTracesNom, controlTracesNom = getTracesFor(initialState[0], initialState[1], stateTraceFileNom, controlTraceFileNom)
-        plotSol1(N, plotControlTraj, stateTracesSmoothOp, controlTracesSmoothOp, stateTracesGP, controlTracesGP, stateTraceGPofflineCovar, controlTraceGPofflineCovar, stateTracesNom, controlTracesNom, goal_x, goal_y, obstacle_x, obstacle_y)
+        stateTracesSmoothOp, controlTracesSmoothOp, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileSmoothOp, controlTraceFileSmoothOp)
+        stateTraceGPofflineCovar, controlTraceGPofflineCovar, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar)
+        stateTracesNom, controlTracesNom, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileNom, controlTraceFileNom)
+        plotSol1(N, plotControlTraj, stateTracesSmoothOp, controlTracesSmoothOp, stateTraceGPofflineCovar, controlTraceGPofflineCovar, stateTracesNom, controlTracesNom, goal_x, goal_y, obstacle_x, obstacle_y)
 
 def checkSAT(stateTraj, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y):
     #This routine checks whether the trajectory satisfies the STL specification by using gurobi to try and assign integer variables, 
@@ -516,7 +515,7 @@ def satList(N, stateTraceFile, controlTraceFile, goal_x, goal_y, obstacle_x, obs
     satList = []
     initialStates = getInitialStates(stateTraceFile)
     for initialState in initialStates:
-        stateTraces, _ = getTracesFor(initialState[0], initialState[1], stateTraceFile, controlTraceFile)
+        stateTraces, _, _ = getTracesFor(initialState[0], initialState[1], stateTraceFile, controlTraceFile)
         satCount = 0
         for stateTrace in stateTraces:
             if stateTrace.shape[0] >= N:
@@ -530,14 +529,16 @@ def satList(N, stateTraceFile, controlTraceFile, goal_x, goal_y, obstacle_x, obs
 
 def avgControlEffort(N, stateTraceFile, controlTraceFile):
     avgControlEffort = -1
+    controlEffortStd = 0
     initialStates = getInitialStates(stateTraceFile)
 
     totalControlEffort = 0
+    controlEffortList = []
     recursivelyFeasibleCount = 0
-    bigEffortCount = 0
+    bigEffortCount = 0 #used for debugging
     bigEffortSum = 0
     for initialState in initialStates:
-        stateTraces, controlTraces = getTracesFor(initialState[0], initialState[1], stateTraceFile, controlTraceFile)
+        stateTraces, controlTraces, _ = getTracesFor(initialState[0], initialState[1], stateTraceFile, controlTraceFile)
         assert(len(stateTraces) == len(controlTraces))
         for i in range(len(stateTraces)):
             controlTrace = controlTraces[i]
@@ -548,11 +549,19 @@ def avgControlEffort(N, stateTraceFile, controlTraceFile):
                     bigEffortCount += 1
                     bigEffortSum += controlEffort
                 totalControlEffort += controlEffort
+                controlEffortList += [controlEffort]
                 
     if recursivelyFeasibleCount > 0:
         avgControlEffort = totalControlEffort/recursivelyFeasibleCount
 
-    return avgControlEffort
+    if len(controlEffortList) > 0:
+        controlEffortList = np.vstack(controlEffortList)
+        avgControlEffort = controlEffortList.mean()
+        controlEffortStd = controlEffortList.std()
+        controlEffortQ95, controlEffortQ5 = np.percentile(controlEffortList, [95, 5])
+        controlEffortIQR = controlEffortQ95 - controlEffortQ5
+        
+    return avgControlEffort, controlEffortStd, controlEffortIQR
 
 def avgRobustness(stateTraceFile, controlTraceFile, goal_x, goal_y, obstacle_x, obstacle_y):
     initialStates = getInitialStates(stateTraceFile)
@@ -560,7 +569,7 @@ def avgRobustness(stateTraceFile, controlTraceFile, goal_x, goal_y, obstacle_x, 
     recursively_feasible_count = 0
 
     for initialState in initialStates:
-        stateTraces, controlTraces = getTracesFor(initialState[0], initialState[1], stateTraceFile, controlTraceFile)
+        stateTraces, controlTraces, _ = getTracesFor(initialState[0], initialState[1], stateTraceFile, controlTraceFile)
         # STL_sat_count = 0
         obstacle_x_0_rho = [0]*(N+1)
         obstacle_x_1_rho = [0]*(N+1)
@@ -619,27 +628,63 @@ def avgRobustness(stateTraceFile, controlTraceFile, goal_x, goal_y, obstacle_x, 
 
     return avg_rho
 
+def timingStatsAll(timingTrace):
+    timingAvg = -1
+    timingStddev = 0
+
+    timingTrace.seek(0)
+
+    solveTimes = []
+    for line in timingTrace:
+        if line != "~\n":
+            solveTime = float(line.split("\n")[0])
+            solveTimes.append(solveTime)
+
+    solveTimes = np.array(solveTimes)
+    timingAvg = solveTimes.mean()
+    timingStddev = solveTimes.std()
+    timingQ95, timingQ5 = np.percentile(solveTimes, [95, 5])
+    timingIQR = timingQ95 - timingQ5
+
+    return timingAvg, timingStddev, timingIQR
+
+# def timingStatsListByInitialState(stateTrace, timingTrace):
+#     meanList = []
+#     stdList = []
+#     initialStates = getInitialStates(stateTrace)
+#     for initialState in initialStates:
+#         _, _, timesForInitialState = getTracesFor(initialState[0], initialState[1], stateTraceFile=stateTrace, solveTimeTraceFile=timingTrace)
+#         for 
+
 smoothOp_state_trace = open("./trace_data/autocar_state_traces_smoothOp.txt", "r")
 smoothOp_control_trace = open("./trace_data/autocar_control_traces_smoothOp.txt", "r")
+smoothOp_solveTime_trace = open("./trace_data/autocar_solveTime_traces_smoothOp.txt", "r")
 LTVGP_state_trace = open("./trace_data/autocar_state_trace_LTVGP.txt", "r")
 LTVGP_control_trace = open("./trace_data/autocar_control_trace_LTVGP.txt", "r")
-LTVGP_state_trace_offlineCovar = open("./trace_data/autocar_state_trace_LTVGP_offlineCovar.txt", "r")
-LTVGP_control_trace_offlineCovar = open("./trace_data/autocar_control_trace_LTVGP_offlineCovar.txt", "r")
+LTVGP_state_trace_offlineCovar = open("./trace_data/autocar_state_trace_LTVGP_offlineCovar_eps"+str(prstlEpsilon)+".txt", "r")
+LTVGP_control_trace_offlineCovar = open("./trace_data/autocar_control_trace_LTVGP_offlineCovar_eps"+str(prstlEpsilon)+".txt", "r")
+LTVGP_solveTime_trace_offlineCovar = open("./trace_data/autocar_solveTime_traces_LTVGP_offlineCovar_eps"+str(prstlEpsilon)+".txt", "r")
 nom_state_trace = open("./trace_data/autocar_state_trace_nom.txt", "r")
 nom_control_trace = open("./trace_data/autocar_control_trace_nom.txt", "r")
+nom_solveTime_trace = open("./trace_data/autocar_solveTime_traces_nom.txt", "r")
 
-plotAllSol(N, False, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace, LTVGP_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace)
-# plotAllSol1(N, False, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace, LTVGP_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace)
+# plotAllSol(N, False, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace, LTVGP_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace)
+plotAllSol1(N, False, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace)
 # plt.show()
-avgRhoSmooth = avgRobustness(smoothOp_state_trace, smoothOp_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
-avgRhoLTV = avgRobustness(LTVGP_state_trace, LTVGP_control_trace_offlineCovar, goal_x, goal_y, obstacle_x, obstacle_y)
-avgRhoLTV_offlinecovar = avgRobustness(LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, goal_x, goal_y, obstacle_x, obstacle_y)
-avgRhoNom = avgRobustness(nom_state_trace, nom_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 
-avgControlEffortSmoothOp = avgControlEffort(N, smoothOp_state_trace, smoothOp_control_trace)
-avgControlEffortLTV = avgControlEffort(N, LTVGP_state_trace, LTVGP_control_trace)
-avgControlEffortLTVofflineCovar = avgControlEffort(N, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar)
-avgControlEffortNom = avgControlEffort(N, nom_state_trace, nom_control_trace)
+timingAvgSmooth, timingStdSmooth, timingIqrSmooth = timingStatsAll(smoothOp_solveTime_trace)
+timingAvgLTV_offlinecovar, timingStdLTV_offlinecovar, timingIqrLTV_offlinecovar = timingStatsAll(LTVGP_solveTime_trace_offlineCovar)
+timingAvgNom, timingStdNom, timingIqrNom = timingStatsAll(nom_solveTime_trace)
+
+# avgRhoSmooth = avgRobustness(smoothOp_state_trace, smoothOp_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
+# avgRhoLTV = avgRobustness(LTVGP_state_trace, LTVGP_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
+# avgRhoLTV_offlinecovar = avgRobustness(LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, goal_x, goal_y, obstacle_x, obstacle_y)
+# avgRhoNom = avgRobustness(nom_state_trace, nom_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
+
+avgControlEffortSmoothOp, controlEffortStdSmoothOp, controlEffortIqrSmoothOp = avgControlEffort(N, smoothOp_state_trace, smoothOp_control_trace)
+avgControlEffortLTV, controlEffortStdLTV, controlEffortIqrLTV = avgControlEffort(N, LTVGP_state_trace, LTVGP_control_trace)
+avgControlEffortLTVofflineCovar, controlEffortStdLTVofflineCovar, controlEffortIqrLTVofflinecovar = avgControlEffort(N, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar)
+avgControlEffortNom, controlEffortStdNom, controlEffortIqrNom = avgControlEffort(N, nom_state_trace, nom_control_trace)
 
 satSmoothOp, recursiveFeasibilitySmoothOp = satLoop(smoothOp_state_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 satGP, recursiveFeasibilityGP = satLoop(LTVGP_state_trace, goal_x, goal_y, obstacle_x, obstacle_y)
@@ -679,15 +724,20 @@ print("GP offline covar: ", str(recursiveFeasibilityGPofflineCovar))
 print("Nom: ", str(recursiveFeasibilityNom))
 
 print("---Control effort cost---")
-print("Smooth: ", str(avgControlEffortSmoothOp))
-print("GP: ", str(avgControlEffortLTV))
-print("GP offline covar: ", str(avgControlEffortLTVofflineCovar))
-print("Nom: ", str(avgControlEffortNom))
+print("Smooth Avg: ", str(avgControlEffortSmoothOp), " Std: ", str(controlEffortStdSmoothOp), " IQR: ", str(controlEffortIqrSmoothOp))
+print("GP Avg: ", str(avgControlEffortLTV), " Std: ", str(controlEffortStdLTV), " IQR: ", str(controlEffortIqrLTV))
+print("GP offline covar Avg: ", str(avgControlEffortLTVofflineCovar), " Std: ", str(controlEffortStdLTVofflineCovar), " IQR: ", str(controlEffortIqrLTVofflinecovar))
+print("Nom Avg: ", str(avgControlEffortNom), " Std: ", str(controlEffortStdNom), " IQR: ", str(controlEffortIqrNom))
 
 print("---Avg Robustness---")
 print("Smooth: ", str(avgRhoSmooth))
 print("GP: ", str(avgRhoLTV))
 print("GP offline: ", str(avgRhoLTV_offlinecovar))
 print("Nom: ", str(avgRhoNom))
+
+print("---Solve Time---")
+print("Smooth Avg: ", str(timingAvgSmooth), " Std: ", str(timingStdSmooth), " IQR: ", str(timingIqrSmooth))
+print("GP offline covar Avg: ", str(timingAvgLTV_offlinecovar), " Std: ", str(timingStdLTV_offlinecovar), " IQR: ", str(timingIqrLTV_offlinecovar))
+print("Nom Avg: ", str(timingAvgNom), " Std: ", str(timingStdNom), " IQR: ", str(timingIqrNom))
 
 plt.show()
