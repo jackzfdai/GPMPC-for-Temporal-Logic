@@ -11,7 +11,7 @@ import single_track_model_car as stcar
 p = parameters_vehicle2()
 g = 9.81  # [m/s^2]
 
-# control model -----------------------------------------------------------------
+# control model limits -----------------------------------------------------------------
 carlf = 1.156 # this doesn't seem to be in the framework files, but it is in the documentation
 carlr = 1.422
 xlim = [0, 100] #m
@@ -26,24 +26,6 @@ carAngCovarLim = [0, 100]
 vSteerAngLim = [-0.39, 0.39]
 accelLim = [-11.4, 11.4]
 
-car_sys = stcar.singleTrackCarModel(lwb = carlf + carlr, params = p)
-car_sys.setLimits(xlim, ylim, steerAngLim, vlim, carAngLim, vSteerAngLim, accelLim)
-
-car_residualStateDims = [4, 4, 4, 4, 4]
-car_residualInputDims = [2, 2, 2, 2, 2]
-
-car_GP_x_file = open("./gp_model_data/GP_x.txt", "r")
-car_GP_y_file = open("./gp_model_data/GP_y.txt", "r")
-car_GP_v_file = open("./gp_model_data/GP_v.txt", "r")
-car_GP_carAng_file = open("./gp_model_data/GP_carAng.txt", "r")
-
-car_sys.setGPResidualsFromFile(car_residualStateDims, car_residualInputDims, car_GP_x_file, car_GP_y_file, None, car_GP_v_file, car_GP_carAng_file)
-
-car_GP_x_file.close()
-car_GP_y_file.close()
-car_GP_v_file.close()
-car_GP_carAng_file.close()
-
 # Horizon 
 T = 4
 N = 32
@@ -55,7 +37,7 @@ obstacle_y = [0, 3]
 goal_min_speed = 15
 goal_carAng = [-1/20*math.pi, 1/20*math.pi]
 
-prstlEpsilon = 0.3
+prstlEpsilon = 0.1
 
 bigMx = xlim[1] - xlim[0] + 1
 bigMy = ylim[1] - ylim[0] + 1
@@ -282,15 +264,16 @@ def plotAllSol(N, plotControlTraj, stateTraceFileSmoothOp, controlTraceFileSmoot
         stateTracesNom, controlTracesNom, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileNom, controlTraceFileNom)
         plotSol(N, plotControlTraj, stateTracesSmoothOp, controlTracesSmoothOp, stateTracesGP, controlTracesGP, stateTraceGPofflineCovar, controlTraceGPofflineCovar, stateTracesNom, controlTracesNom, goal_x, goal_y, obstacle_x, obstacle_y)
 
-def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP_offlineCovar = [], u_GP_offlineCovar = [], x_Nom = [], u_Nom = [], goal_A_polygon_x = [], goal_A_polygon_y = [], obstacle_polygon_x = [], obstacle_polygon_y = []):
+def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP_offlineCovar = [], u_GP_offlineCovar = [], x_Nom = [], u_Nom = [], x_Oracle = [], u_Oracle = [], goal_A_polygon_x = [], goal_A_polygon_y = [], obstacle_polygon_x = [], obstacle_polygon_y = []):
     params = {'mathtext.default': 'regular',
               'pdf.fonttype' : 42 }          
     plt.rcParams.update(params)
     nom_plotIdx = 0
     smoothOp_plotIdx = 1
     GP_offlineCovar_plotIdx = 2
+    oracle_plotIdx = 3
     
-    fig, ax = plt.subplots(3, 1, constrained_layout=True)
+    fig, ax = plt.subplots(4, 1, constrained_layout=True)
 
     controller_label_x = 99
     controller_label_y = 4.5
@@ -298,6 +281,7 @@ def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP_offlineCovar
     nom_color = 'xkcd:amethyst'
     smoothOp_color = 'xkcd:windows blue'
     lri_color = 'xkcd:orangish'
+    oracle_color = 'xkcd:blue purple'
 
     if len(goal_A_polygon_x) > 0:
         goal_A_polygon_x_plot = [goal_A_polygon_x[0], goal_A_polygon_x[0], goal_A_polygon_x[1], goal_A_polygon_x[1]]
@@ -319,6 +303,11 @@ def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP_offlineCovar
         ax[nom_plotIdx].plot(goal_A_polygon_x_plot + [goal_A_polygon_x[0]], goal_A_polygon_y_plot + [goal_A_polygon_y[1]], 'g')
         ax[nom_plotIdx].fill(obstacle_polygon_x_plot, obstacle_polygon_y_plot, 'lightslategray', alpha=0.5)
         ax[nom_plotIdx].plot(obstacle_polygon_x_plot + [obstacle_polygon_x[0]], obstacle_polygon_y_plot + [obstacle_polygon_y[1]], 'lightslategray')
+
+        ax[oracle_plotIdx].fill(goal_A_polygon_x_plot, goal_A_polygon_y_plot, 'g', alpha=0.5)
+        ax[oracle_plotIdx].plot(goal_A_polygon_x_plot + [goal_A_polygon_x[0]], goal_A_polygon_y_plot + [goal_A_polygon_y[1]], 'g')
+        ax[oracle_plotIdx].fill(obstacle_polygon_x_plot, obstacle_polygon_y_plot, 'lightslategray', alpha=0.5)
+        ax[oracle_plotIdx].plot(obstacle_polygon_x_plot + [obstacle_polygon_x[0]], obstacle_polygon_y_plot + [obstacle_polygon_y[1]], 'lightslategray')
 
     ax[smoothOp_plotIdx].set_xlim(xlim[0], xlim[1])
     ax[smoothOp_plotIdx].set_ylim(ylim[0], ylim[1])
@@ -350,6 +339,16 @@ def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP_offlineCovar
         ax[nom_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=nom_color)
     ax[nom_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
 
+    ax[oracle_plotIdx].set_xlim(xlim[0], xlim[1])
+    ax[oracle_plotIdx].set_ylim(ylim[0], ylim[1])
+    ax[oracle_plotIdx].set_xlabel('$s_x\, (m)$')
+    ax[oracle_plotIdx].set_ylabel('$s_y\, (m)$')
+    ax[oracle_plotIdx].text(controller_label_x, controller_label_y, 'Oracle', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
+
+    for traj in x_Oracle:
+        ax[oracle_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=oracle_color)
+    ax[oracle_plotIdx].scatter(traj[0,0], traj[0,1], s=120, facecolors='none', edgecolors='black')
+
     if plotControl:
         fig_u, ax_u = plt.subplots(2, 1, constrained_layout=True)
         vSteerAngIdx = 0
@@ -376,13 +375,14 @@ def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP_offlineCovar
         ax_u[vSteerAngIdx].legend(handles=[nom_vSteerAng, gpOfflineCovar_vSteerAng])
         ax_u[accelIdx].legend(handles=[nom_accel, gpOfflineCovar_accel])
 
-def plotAllSol1(N, plotControlTraj, stateTraceFileSmoothOp, controlTraceFileSmoothOp, stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar, stateTraceFileNom, controlTraceFileNom):
+def plotAllSol1(N, plotControlTraj, stateTraceFileSmoothOp, controlTraceFileSmoothOp, stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar, stateTraceFileNom, controlTraceFileNom, stateTraceFileOracle, controlTraceFileOracle):
     initialStatesSmoothOp = getInitialStates(stateTraceFileSmoothOp)
     for initialState in initialStatesSmoothOp:
         stateTracesSmoothOp, controlTracesSmoothOp, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileSmoothOp, controlTraceFileSmoothOp)
         stateTraceGPofflineCovar, controlTraceGPofflineCovar, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileGPofflineCovar, controlTraceFileGPofflineCovar)
         stateTracesNom, controlTracesNom, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileNom, controlTraceFileNom)
-        plotSol1(N, plotControlTraj, stateTracesSmoothOp, controlTracesSmoothOp, stateTraceGPofflineCovar, controlTraceGPofflineCovar, stateTracesNom, controlTracesNom, goal_x, goal_y, obstacle_x, obstacle_y)
+        stateTracesOracle, controlTracesOracle, _ = getTracesFor(initialState[0], initialState[1], stateTraceFileOracle, controlTraceFileOracle)
+        plotSol1(N, plotControlTraj, stateTracesSmoothOp, controlTracesSmoothOp, stateTraceGPofflineCovar, controlTraceGPofflineCovar, stateTracesNom, controlTracesNom, stateTracesOracle, controlTracesOracle, goal_x, goal_y, obstacle_x, obstacle_y)
 
 def checkSAT(stateTraj, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y):
     #This routine checks whether the trajectory satisfies the STL specification by using gurobi to try and assign integer variables, 
@@ -538,6 +538,7 @@ def avgControlEffort(N, stateTraceFile, controlTraceFile):
     bigEffortCount = 0 #used for debugging
     bigEffortSum = 0
     for initialState in initialStates:
+        controlEffortListForInitialState = []
         stateTraces, controlTraces, _ = getTracesFor(initialState[0], initialState[1], stateTraceFile, controlTraceFile)
         assert(len(stateTraces) == len(controlTraces))
         for i in range(len(stateTraces)):
@@ -550,6 +551,15 @@ def avgControlEffort(N, stateTraceFile, controlTraceFile):
                     bigEffortSum += controlEffort
                 totalControlEffort += controlEffort
                 controlEffortList += [controlEffort]
+                controlEffortListForInitialState += [controlEffort]
+        controlEffortListForInitialState = np.array(controlEffortListForInitialState)
+        print("mean: ", str(controlEffortListForInitialState.mean()), " Std: ", str(controlEffortListForInitialState.std()))
+        counts, bins = np.histogram(controlEffortListForInitialState, 10)
+        print("Counts: ", str(counts))
+        # fig =plt.figure()
+
+        # plt.stairs(counts, bins)
+        # plt.show()
                 
     if recursivelyFeasibleCount > 0:
         avgControlEffort = totalControlEffort/recursivelyFeasibleCount
@@ -558,10 +568,12 @@ def avgControlEffort(N, stateTraceFile, controlTraceFile):
         controlEffortList = np.vstack(controlEffortList)
         avgControlEffort = controlEffortList.mean()
         controlEffortStd = controlEffortList.std()
+        controlEffortQ75, controlEffortQ25 = np.percentile(controlEffortList, [75, 25])
+        controlEffortIQR = controlEffortQ75 - controlEffortQ25
         controlEffortQ95, controlEffortQ5 = np.percentile(controlEffortList, [95, 5])
-        controlEffortIQR = controlEffortQ95 - controlEffortQ5
+        controlEffortMed = np.median(controlEffortList)
         
-    return avgControlEffort, controlEffortStd, controlEffortIQR
+    return avgControlEffort, controlEffortStd, controlEffortMed, controlEffortIQR, controlEffortQ95, controlEffortQ5, controlEffortList
 
 def avgRobustness(stateTraceFile, controlTraceFile, goal_x, goal_y, obstacle_x, obstacle_y):
     initialStates = getInitialStates(stateTraceFile)
@@ -633,32 +645,36 @@ def timingStatsAll(timingTrace):
     timingStddev = 0
 
     timingTrace.seek(0)
+    withinControlIntervalCount = 0
 
     solveTimes = []
     for line in timingTrace:
         if line != "~\n":
             solveTime = float(line.split("\n")[0])
             solveTimes.append(solveTime)
+            if solveTime < T/N:
+                withinControlIntervalCount += 1
 
     solveTimes = np.array(solveTimes)
     timingAvg = solveTimes.mean()
     timingStddev = solveTimes.std()
+    timingQ75, timingQ25 = np.percentile(solveTimes, [75, 25])
+    timingIQR = timingQ75 - timingQ25
     timingQ95, timingQ5 = np.percentile(solveTimes, [95, 5])
-    timingIQR = timingQ95 - timingQ5
+    timingMed = np.median(solveTimes)
 
-    return timingAvg, timingStddev, timingIQR
+    withinControlIntervalPercent = -1
+    if len(solveTimes) > 0:
+        withinControlIntervalPercent = withinControlIntervalCount/len(solveTimes)*100
 
-# def timingStatsListByInitialState(stateTrace, timingTrace):
-#     meanList = []
-#     stdList = []
-#     initialStates = getInitialStates(stateTrace)
-#     for initialState in initialStates:
-#         _, _, timesForInitialState = getTracesFor(initialState[0], initialState[1], stateTraceFile=stateTrace, solveTimeTraceFile=timingTrace)
-#         for 
+    return timingAvg, timingStddev, timingMed, timingIQR, timingQ95, timingQ5, withinControlIntervalPercent
 
 smoothOp_state_trace = open("./trace_data/autocar_state_traces_smoothOp.txt", "r")
 smoothOp_control_trace = open("./trace_data/autocar_control_traces_smoothOp.txt", "r")
 smoothOp_solveTime_trace = open("./trace_data/autocar_solveTime_traces_smoothOp.txt", "r")
+oracle_smoothOp_state_trace = open("./trace_data/autocar_state_traces_oracle_smoothOp.txt", "r")
+oracle_smoothOp_control_trace = open("./trace_data/autocar_control_traces_oracle_smoothOp.txt", "r")
+oracle_smoothOp_solveTime_trace = open("./trace_data/autocar_solveTime_traces_oracle_smoothOp.txt", "r")
 LTVGP_state_trace = open("./trace_data/autocar_state_trace_LTVGP.txt", "r")
 LTVGP_control_trace = open("./trace_data/autocar_control_trace_LTVGP.txt", "r")
 LTVGP_state_trace_offlineCovar = open("./trace_data/autocar_state_trace_LTVGP_offlineCovar_eps"+str(prstlEpsilon)+".txt", "r")
@@ -669,75 +685,92 @@ nom_control_trace = open("./trace_data/autocar_control_trace_nom.txt", "r")
 nom_solveTime_trace = open("./trace_data/autocar_solveTime_traces_nom.txt", "r")
 
 # plotAllSol(N, False, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace, LTVGP_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace)
-plotAllSol1(N, False, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace)
+plotAllSol1(N, False, smoothOp_state_trace, smoothOp_control_trace, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, nom_state_trace, nom_control_trace, oracle_smoothOp_state_trace, oracle_smoothOp_control_trace)
 # plt.show()
 
-timingAvgSmooth, timingStdSmooth, timingIqrSmooth = timingStatsAll(smoothOp_solveTime_trace)
-timingAvgLTV_offlinecovar, timingStdLTV_offlinecovar, timingIqrLTV_offlinecovar = timingStatsAll(LTVGP_solveTime_trace_offlineCovar)
-timingAvgNom, timingStdNom, timingIqrNom = timingStatsAll(nom_solveTime_trace)
+timingAvgSmooth, timingStdSmooth, timingMedSmooth, timingIqrSmooth, timing95Smooth, timing5Smooth, timingWithinThresholdPercentSmooth = timingStatsAll(smoothOp_solveTime_trace)
+timingAvgOracleSmooth, timingStdOracleSmooth, timingMedOracleSmooth, timingIqrOracleSmooth, timing95OracleSmooth, timing5OracleSmooth, timingWithinThresholdPercentOracleSmooth = timingStatsAll(oracle_smoothOp_solveTime_trace)
+timingAvgLTV_offlinecovar, timingStdLTV_offlinecovar, timingMedLTV_offlinecovar, timingIqrLTV_offlinecovar, timing95LTV_offlinecovar, timing5LTV_offlinecovar, timingWithinThresholdPercentLTV_offlinecovar = timingStatsAll(LTVGP_solveTime_trace_offlineCovar)
+timingAvgNom, timingStdNom, timingMedNom, timingIqrNom, timing95Nom, timing5Nom, timingWithinThresholdPercentNom = timingStatsAll(nom_solveTime_trace)
 
-# avgRhoSmooth = avgRobustness(smoothOp_state_trace, smoothOp_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
-# avgRhoLTV = avgRobustness(LTVGP_state_trace, LTVGP_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
-# avgRhoLTV_offlinecovar = avgRobustness(LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, goal_x, goal_y, obstacle_x, obstacle_y)
-# avgRhoNom = avgRobustness(nom_state_trace, nom_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
+avgRhoSmooth = avgRobustness(smoothOp_state_trace, smoothOp_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
+avgRhoOracleSmooth = avgRobustness(oracle_smoothOp_state_trace, oracle_smoothOp_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
+avgRhoLTV = avgRobustness(LTVGP_state_trace, LTVGP_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
+avgRhoLTV_offlinecovar = avgRobustness(LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, goal_x, goal_y, obstacle_x, obstacle_y)
+avgRhoNom = avgRobustness(nom_state_trace, nom_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 
-avgControlEffortSmoothOp, controlEffortStdSmoothOp, controlEffortIqrSmoothOp = avgControlEffort(N, smoothOp_state_trace, smoothOp_control_trace)
-avgControlEffortLTV, controlEffortStdLTV, controlEffortIqrLTV = avgControlEffort(N, LTVGP_state_trace, LTVGP_control_trace)
-avgControlEffortLTVofflineCovar, controlEffortStdLTVofflineCovar, controlEffortIqrLTVofflinecovar = avgControlEffort(N, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar)
-avgControlEffortNom, controlEffortStdNom, controlEffortIqrNom = avgControlEffort(N, nom_state_trace, nom_control_trace)
+avgControlEffortSmoothOp, controlEffortStdSmoothOp, controlEffortMedSmoothOp, controlEffortIqrSmoothOp, controlEffort95SmoothOp, controlEffort5SmoothOp, controlEffortListSmoothOp = avgControlEffort(N, smoothOp_state_trace, smoothOp_control_trace)
+avgControlEffortOracleSmoothOp, controlEffortStdOracleSmoothOp, controlEffortMedOracleSmoothOp, controlEffortIqrOracleSmoothOp, controlEffort95OracleSmoothOp, controlEffort5OracleSmoothOp, controlEffortListOracleSmoothOp = avgControlEffort(N, oracle_smoothOp_state_trace, oracle_smoothOp_control_trace)
+avgControlEffortLTV, controlEffortStdLTV, controlEffortMedLTV, controlEffortIqrLTV, controlEffort95LTV, controlEffort5LTV, _ = avgControlEffort(N, LTVGP_state_trace, LTVGP_control_trace)
+avgControlEffortLTVofflineCovar, controlEffortStdLTVofflineCovar, controlEffortMedLTVofflinecovar, controlEffortIqrLTVofflinecovar, controlEffort95LTVofflinecovar, controlEffort5LTVofflinecovar, controlEffortListLTV_offlinecovar = avgControlEffort(N, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar)
+avgControlEffortNom, controlEffortStdNom, controlEffortMedNom, controlEffortIqrNom, controlEffort95Nom, controlEffort5Nom, controlEffortListNom = avgControlEffort(N, nom_state_trace, nom_control_trace)
 
 satSmoothOp, recursiveFeasibilitySmoothOp = satLoop(smoothOp_state_trace, goal_x, goal_y, obstacle_x, obstacle_y)
+satOracleSmoothOp, recursiveFeasibilityOracleSmoothOp = satLoop(oracle_smoothOp_state_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 satGP, recursiveFeasibilityGP = satLoop(LTVGP_state_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 satGPofflineCovar, recursiveFeasibilityGPofflineCovar = satLoop(LTVGP_state_trace_offlineCovar, goal_x, goal_y, obstacle_x, obstacle_y)
 satNom, recursiveFeasibilityNom = satLoop(nom_state_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 
 satListSmoothOp = satList(N, smoothOp_state_trace, smoothOp_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
+satListOracleSmoothOp = satList(N, oracle_smoothOp_state_trace, oracle_smoothOp_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 satListNom = satList(N, nom_state_trace, nom_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 satListGP = satList(N, LTVGP_state_trace, LTVGP_control_trace, goal_x, goal_y, obstacle_x, obstacle_y)
 satListGP_offlineCovar = satList(N, LTVGP_state_trace_offlineCovar, LTVGP_control_trace_offlineCovar, goal_x, goal_y, obstacle_x, obstacle_y)
 
 smoothOp_state_trace.close()
 smoothOp_control_trace.close()
+smoothOp_solveTime_trace.close()
+oracle_smoothOp_state_trace.close()
+oracle_smoothOp_control_trace.close()
+oracle_smoothOp_solveTime_trace.close()
 LTVGP_state_trace.close()
 LTVGP_control_trace.close()
 LTVGP_state_trace_offlineCovar.close()
 LTVGP_control_trace_offlineCovar.close()
+LTVGP_solveTime_trace_offlineCovar.close()
 nom_state_trace.close()
 nom_control_trace.close()
+nom_solveTime_trace.close()
 
 print("---Sat stats---")
 print("Smooth: ", str(satSmoothOp))
+print("Smooth (oracle): ", str(satOracleSmoothOp))
 print("GP: ", str(satGP))
 print("GP offline covar: ", str(satGPofflineCovar))
 print("Nom: ", str(satNom))
 
 print("---Sat List---")
 print("Smooth:, ", satListSmoothOp)
+print("Smooth (oracle):, ", satListOracleSmoothOp)
 print("GP: ", satListGP)
 print("GP offline covar: ", satListGP_offlineCovar)
 print("Nom: ", satListNom)
 
 print("---Recursive feasibility---")
 print("Smooth: ", str(recursiveFeasibilitySmoothOp))
+print("Smooth (oracle): ", str(recursiveFeasibilityOracleSmoothOp))
 print("GP: ", str(recursiveFeasibilityGP))
 print("GP offline covar: ", str(recursiveFeasibilityGPofflineCovar))
 print("Nom: ", str(recursiveFeasibilityNom))
 
 print("---Control effort cost---")
-print("Smooth Avg: ", str(avgControlEffortSmoothOp), " Std: ", str(controlEffortStdSmoothOp), " IQR: ", str(controlEffortIqrSmoothOp))
-print("GP Avg: ", str(avgControlEffortLTV), " Std: ", str(controlEffortStdLTV), " IQR: ", str(controlEffortIqrLTV))
-print("GP offline covar Avg: ", str(avgControlEffortLTVofflineCovar), " Std: ", str(controlEffortStdLTVofflineCovar), " IQR: ", str(controlEffortIqrLTVofflinecovar))
-print("Nom Avg: ", str(avgControlEffortNom), " Std: ", str(controlEffortStdNom), " IQR: ", str(controlEffortIqrNom))
+print("Smooth Avg: ", str(avgControlEffortSmoothOp), " Std: ", str(controlEffortStdSmoothOp), " Med: ", str(controlEffortMedSmoothOp), " IQR: ", str(controlEffortIqrSmoothOp), " 95: ", str(controlEffort95SmoothOp), " 5: ", str(controlEffort5SmoothOp))
+print("Smooth (oracle) Avg: ", str(avgControlEffortOracleSmoothOp), " Std: ", str(controlEffortStdOracleSmoothOp), " Med: ", str(controlEffortMedOracleSmoothOp), " IQR: ", str(controlEffortIqrOracleSmoothOp), " 95: ", str(controlEffort95OracleSmoothOp), " 5: ", str(controlEffort5OracleSmoothOp))
+print("GP Avg: ", str(avgControlEffortLTV), " Std: ", str(controlEffortStdLTV), " Med: ", str(controlEffortMedLTV), " IQR: ", str(controlEffortIqrLTV), " 95: ", str(controlEffort95LTV), " 5: ", str(controlEffort5LTV))
+print("GP offline covar Avg: ", str(avgControlEffortLTVofflineCovar), " Std: ", str(controlEffortStdLTVofflineCovar), " Med: ", str(controlEffortMedLTVofflinecovar), " IQR: ", str(controlEffortIqrLTVofflinecovar), " 95: ", str(controlEffort95LTVofflinecovar), " 5: ", str(controlEffort5LTVofflinecovar))
+print("Nom Avg: ", str(avgControlEffortNom), " Std: ", str(controlEffortStdNom), " Med: ", str(controlEffortMedNom), " IQR: ", str(controlEffortIqrNom), " 95: ", str(controlEffort95Nom), " 5: ", str(controlEffort5Nom))
 
 print("---Avg Robustness---")
 print("Smooth: ", str(avgRhoSmooth))
+print("Smooth (oracle): ", str(avgRhoOracleSmooth))
 print("GP: ", str(avgRhoLTV))
 print("GP offline: ", str(avgRhoLTV_offlinecovar))
 print("Nom: ", str(avgRhoNom))
 
 print("---Solve Time---")
-print("Smooth Avg: ", str(timingAvgSmooth), " Std: ", str(timingStdSmooth), " IQR: ", str(timingIqrSmooth))
-print("GP offline covar Avg: ", str(timingAvgLTV_offlinecovar), " Std: ", str(timingStdLTV_offlinecovar), " IQR: ", str(timingIqrLTV_offlinecovar))
-print("Nom Avg: ", str(timingAvgNom), " Std: ", str(timingStdNom), " IQR: ", str(timingIqrNom))
+print("Smooth Avg: ", str(timingAvgSmooth), " Std: ", str(timingStdSmooth), " Within Threshold: ", str(timingWithinThresholdPercentSmooth), " 95: ", str(timing95Smooth), " 5: ", str(timing5Smooth)) #" Med: ", str(timingMedSmooth), " IQR: ", str(timingIqrSmooth), " 95: ", str(timing95Smooth), " 5: ", str(timing5Smooth))
+print("Smooth (oracle) Avg: ", str(timingAvgOracleSmooth), " Std: ", str(timingStdOracleSmooth), " Within Threshold: ", str(timingWithinThresholdPercentOracleSmooth), " 95: ", str(timing95OracleSmooth), " 5: ", str(timing5OracleSmooth)) #" Med: ", str(timingMedOracleSmooth), " IQR: ", str(timingIqrOracleSmooth), " 95: ", str(timing95OracleSmooth), " 5: ", str(timing5OracleSmooth))
+print("GP offline covar Avg: ", str(timingAvgLTV_offlinecovar), " Std: ", str(timingStdLTV_offlinecovar), " Within Threshold: ", str(timingWithinThresholdPercentLTV_offlinecovar), " 95: ", str(timing95LTV_offlinecovar), " 5: ", str(timing5LTV_offlinecovar)) # " Med: ", str(timingMedLTV_offlinecovar), " IQR: ", str(timingIqrLTV_offlinecovar), " 95: ", str(timing95LTV_offlinecovar), " 5: ", str(timing5LTV_offlinecovar))
+print("Nom Avg: ", str(timingAvgNom), " Std: ", str(timingStdNom), " Within Threshold: ", str(timingWithinThresholdPercentNom), " 95: ", str(timing95Nom), " 5: ", str(timing5Nom)) # " Med: ", str(timingMedNom), " IQR: ", str(timingIqrNom), " 95: ", str(timing95Nom), " 5: ", str(timing5Nom))
 
 plt.show()

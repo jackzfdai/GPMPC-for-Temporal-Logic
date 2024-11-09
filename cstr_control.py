@@ -171,7 +171,9 @@ def controlToSetPoint(plot, T, N, cstr, x1_0, x2_0, setpoint, controlEffortCost,
 
     return proc_runtime, feasible, state_opt, control_opt
 
-def solveMINLP(plot, T, N, cstr, x1_0, x2_0, xCovar0, addGP, prstlEpsilon = 0.1, referenceVarTraj = None, referenceControlTraj = None):
+def solveMINLP(plot, T, N, cstr, x1_0, x2_0, xCovar0, addGP, prstlEpsilon = 0.1, addOracle = False, referenceVarTraj = None, referenceControlTraj = None):
+    assert(not(addGP and addOracle))
+    
     feasible = False
     proc_runtime = 0
     state_opt = []
@@ -225,7 +227,7 @@ def solveMINLP(plot, T, N, cstr, x1_0, x2_0, xCovar0, addGP, prstlEpsilon = 0.1,
     M = 4 # RK4 steps per interval
     DT = T/N/M
 
-    cstr_dynamics = cstr.getDiscreteDynamics(T/N, M, addGP)
+    cstr_dynamics = cstr.getDiscreteDynamics(T/N, M, addGP, addOracle)
 
     # Objective term
     L = u**2 
@@ -456,7 +458,7 @@ def solveMINLP(plot, T, N, cstr, x1_0, x2_0, xCovar0, addGP, prstlEpsilon = 0.1,
 
     return proc_runtime, feasible, state_opt, control_opt
 
-def solveSmoothRobustness(plot, T, N, cstr, x1_0, x2_0, referenceVarTraj = None, referenceControlTraj = None):
+def solveSmoothRobustness(plot, T, N, cstr, x1_0, x2_0, addOracle = False, referenceVarTraj = None, referenceControlTraj = None):
     feasible = False
     
     # Declare model variables
@@ -483,7 +485,7 @@ def solveSmoothRobustness(plot, T, N, cstr, x1_0, x2_0, referenceVarTraj = None,
     M = 4 # RK4 steps per interval
     DT = T/N/M
 
-    cstr_dynamics = cstr.getDiscreteDynamics(T/N, M, False)
+    cstr_dynamics = cstr.getDiscreteDynamics(T/N, M, False, addOracle)
             
     # Initial guess for u
     u_start = [DM([0])] * N
@@ -776,15 +778,18 @@ while len(x1_0_configs) < numConfigs :
 
 prstlEpsilon = 0.01
 
-# smoothOp_state_trace_file = open("./trace_data/cstr_30x30_state_traces_smoothOp.txt", "w")
-# smoothOp_control_trace_file = open("./trace_data/cstr_30x30_control_traces_smoothOp.txt", "w")
-# smoothOp_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_smoothOp.txt", "w")
+smoothOp_state_trace_file = open("./trace_data/cstr_30x30_state_traces_smoothOp.txt", "w")
+smoothOp_control_trace_file = open("./trace_data/cstr_30x30_control_traces_smoothOp.txt", "w")
+smoothOp_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_smoothOp.txt", "w")
+oracle_smoothOp_state_trace_file = open("./trace_data/cstr_30x30_state_traces_oracle_smoothOp.txt", "w")
+oracle_smoothOp_control_trace_file = open("./trace_data/cstr_30x30_control_traces_oracle_smoothOp.txt", "w")
+oracle_smoothOp_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_oracle_smoothOp.txt", "w")
 GP_state_trace_file = open("./trace_data/cstr_30x30_state_traces_GP_eps"+str(prstlEpsilon)+".txt", "w")
 GP_control_trace_file = open("./trace_data/cstr_30x30_control_traces_GP_eps"+str(prstlEpsilon)+".txt", "w")
 GP_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_GP_eps"+str(prstlEpsilon)+".txt", "w")
-# Nom_state_trace_file = open("./trace_data/cstr_30x30_state_traces_nom.txt", "w")
-# Nom_control_trace_file = open("./trace_data/cstr_30x30_control_traces_nom.txt", "w")
-# Nom_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_nom.txt", "w")
+Nom_state_trace_file = open("./trace_data/cstr_30x30_state_traces_nom.txt", "w")
+Nom_control_trace_file = open("./trace_data/cstr_30x30_control_traces_nom.txt", "w")
+Nom_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_nom.txt", "w")
 
 
 # totalCostSmoothOpList = []
@@ -794,33 +799,55 @@ GP_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_GP_eps"
 maxSolveTimeSmoothOpList = []
 maxSolveTimeGPList = []
 maxSolveTimeNomList = []
+maxSolveTimeOracleSmoothOpList = []
 
 bigTotalTimeSmoothOp = 0
 bigTotalTimeGP = 0
 bigTotalTimeNom = 0
+bigTotalTimeOracleSmoothOp = 0
 
 totalItersSmoothOp = 0
 totalItersGp = 0
 totalItersNom = 0
+totalItersOracleSmoothOp = 0
 
-# for i in range(numConfigs):
-#     x1_0_i = x1_0_configs[i]
-#     x2_0_i = x2_0_configs[i]
+for i in range(numConfigs):
+    x1_0_i = x1_0_configs[i]
+    x2_0_i = x2_0_configs[i]
 
-#     satSmoothOp = 0
-#     totalCostSmoothOp = 0
-#     maxSolveTimeForConfigSmoothOp = 0
+    satSmoothOp = 0
+    totalCostSmoothOp = 0
+    maxSolveTimeForConfigSmoothOp = 0
 
-#     for j in range(numTrials):
-#         recursiveFeasibilitySmoothOp, avgSolveTimeSmoothOp, maxSolveTimeSmoothOp, totalSolveTimeSmoothOp, itersCompletedSmoothOp, costSmoothOp, _, _, stateTrajSmoothOp = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveSmoothRobustness, (), smoothOp_state_trace_file, smoothOp_control_trace_file, smoothOp_solveTime_trace_file)
-#         bigTotalTimeSmoothOp += totalSolveTimeSmoothOp
-#         totalItersSmoothOp += itersCompletedSmoothOp
+    for j in range(numTrials):
+        recursiveFeasibilitySmoothOp, avgSolveTimeSmoothOp, maxSolveTimeSmoothOp, totalSolveTimeSmoothOp, itersCompletedSmoothOp, costSmoothOp, _, _, stateTrajSmoothOp = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveSmoothRobustness, (), smoothOp_state_trace_file, smoothOp_control_trace_file, smoothOp_solveTime_trace_file)
+        bigTotalTimeSmoothOp += totalSolveTimeSmoothOp
+        totalItersSmoothOp += itersCompletedSmoothOp
         
-#         if maxSolveTimeSmoothOp > maxSolveTimeForConfigSmoothOp:
-#             maxSolveTimeForConfigSmoothOp = maxSolveTimeSmoothOp
+        if maxSolveTimeSmoothOp > maxSolveTimeForConfigSmoothOp:
+            maxSolveTimeForConfigSmoothOp = maxSolveTimeSmoothOp
 
-#     # totalCostSmoothOpList += [totalCostSmoothOp]
-#     maxSolveTimeSmoothOpList += [maxSolveTimeForConfigSmoothOp]
+    # totalCostSmoothOpList += [totalCostSmoothOp]
+    maxSolveTimeSmoothOpList += [maxSolveTimeForConfigSmoothOp]
+
+for i in range(numConfigs):
+    x1_0_i = x1_0_configs[i]
+    x2_0_i = x2_0_configs[i]
+
+    satOracleSmoothOp = 0
+    totalCostOracleSmoothOp = 0
+    maxSolveTimeForConfigOracleSmoothOp = 0
+
+    for j in range(numTrials):
+        recursiveFeasibilityOracleSmoothOp, avgSolveTimeOracleSmoothOp, maxSolveTimeOracleSmoothOp, totalSolveTimeOracleSmoothOp, itersCompletedOracleSmoothOp, costOracleSmoothOp, _, _, stateTrajOracleSmoothOp = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveSmoothRobustness, (True,), oracle_smoothOp_state_trace_file, oracle_smoothOp_control_trace_file, oracle_smoothOp_solveTime_trace_file)
+        bigTotalTimeOracleSmoothOp += totalSolveTimeOracleSmoothOp
+        totalItersOracleSmoothOp += itersCompletedOracleSmoothOp
+        
+        if maxSolveTimeOracleSmoothOp > maxSolveTimeForConfigOracleSmoothOp:
+            maxSolveTimeForConfigOracleSmoothOp = maxSolveTimeOracleSmoothOp
+
+    # totalCostOracleSmoothOpList += [totalCostOracleSmoothOp]
+    maxSolveTimeOracleSmoothOpList += [maxSolveTimeForConfigOracleSmoothOp]
 
 for i in range(numConfigs):
     x1_0_i = x1_0_configs[i]
@@ -842,25 +869,25 @@ for i in range(numConfigs):
     # totalCostGPList += [totalCostGP]
     maxSolveTimeGPList += [maxSolveTimeForConfigGP]
 
-# for i in range(numConfigs):
-#     x1_0_i = x1_0_configs[i]
-#     x2_0_i = x2_0_configs[i]
+for i in range(numConfigs):
+    x1_0_i = x1_0_configs[i]
+    x2_0_i = x2_0_configs[i]
 
-#     satNom = 0
-#     totalCostNom = 0
-#     maxSolveTimeForConfigNom = 0
+    satNom = 0
+    totalCostNom = 0
+    maxSolveTimeForConfigNom = 0
 
-#     for j in range(numTrials):
-#         useGP = False
-#         recursiveFeasibilityNom, avgSolveTimeNom, maxSolveTimeNom, totalSolveTimeNom, itersCompletedNom, costNom, _, _, stateTrajNom = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveMINLP, (xCovar0, useGP), Nom_state_trace_file, Nom_control_trace_file, Nom_solveTime_trace_file)
-#         bigTotalTimeNom += totalSolveTimeNom
-#         totalItersNom += itersCompletedNom
+    for j in range(numTrials):
+        useGP = False
+        recursiveFeasibilityNom, avgSolveTimeNom, maxSolveTimeNom, totalSolveTimeNom, itersCompletedNom, costNom, _, _, stateTrajNom = controlLoop(False, False, True, True, T, N, cstr_sys, cstr_sim_sys, x1_0_i, x2_0_i, solveMINLP, (xCovar0, useGP), Nom_state_trace_file, Nom_control_trace_file, Nom_solveTime_trace_file)
+        bigTotalTimeNom += totalSolveTimeNom
+        totalItersNom += itersCompletedNom
         
-#         if maxSolveTimeNom > maxSolveTimeForConfigNom:
-#             maxSolveTimeForConfigNom = maxSolveTimeNom
+        if maxSolveTimeNom > maxSolveTimeForConfigNom:
+            maxSolveTimeForConfigNom = maxSolveTimeNom
 
-#     # totalCostNomList += [totalCostNom]
-#     maxSolveTimeNomList += [maxSolveTimeForConfigNom]
+    # totalCostNomList += [totalCostNom]
+    maxSolveTimeNomList += [maxSolveTimeForConfigNom]
 
 print("-----initial states-----")
 print("x1: ", x1_0_configs)
@@ -893,14 +920,17 @@ print("Smooth Op: ", totalItersSmoothOp)
 print("GP: ", totalItersGp)
 print("Nom: ", totalItersNom)
 
-# smoothOp_state_trace_file.close()
-# smoothOp_control_trace_file.close()
-# smoothOp_solveTime_trace_file.close()
+smoothOp_state_trace_file.close()
+smoothOp_control_trace_file.close()
+smoothOp_solveTime_trace_file.close()
+oracle_smoothOp_state_trace_file.close()
+oracle_smoothOp_control_trace_file.close()
+oracle_smoothOp_solveTime_trace_file.close()
 GP_state_trace_file.close()
 GP_control_trace_file.close()
 GP_solveTime_trace_file.close()
-# Nom_state_trace_file.close()
-# Nom_control_trace_file.close()
-# Nom_solveTime_trace_file.close()
+Nom_state_trace_file.close()
+Nom_control_trace_file.close()
+Nom_solveTime_trace_file.close()
 
 plt.show()

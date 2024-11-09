@@ -82,15 +82,21 @@ class cstrModel:
     def getInputLimits(self):
         return self.ulim
     
-    def getContinuousDynamics(self): 
+    def getContinuousDynamics(self, oracle = False): 
         xdot = vertcat(-1*self.x[0] + self.paramD*(1 - self.x[0])*exp(self.x[1]/(1 + self.x[1]/self.paramGamma)),
                        -1*self.x[1] + self.paramB*self.paramD*(1 - self.x[0])*exp(self.x[1]/(1 + self.x[1]/self.paramGamma)) + self.paramBeta*(self.u - self.x[1]))
         
+        if oracle == True:
+            ad = 0.035
+            bd = 3.95
+            cd = 0.6
+            xdot = vertcat(-1*self.x[0] + self.paramD*(1 - self.x[0])*exp(self.x[1]/(1 + self.x[1]/self.paramGamma)),
+                       -1*self.x[1] + self.paramB*self.paramD*(1 - self.x[0])*exp(self.x[1]/(1 + self.x[1]/self.paramGamma)) + self.paramBeta*(self.u - self.x[1]) + ad*exp(-1*bd*(self.u+cd)))
         return xdot
     
-    def getDiscreteDynamics(self, controlInterval, RK_steps, addGP):
+    def getDiscreteDynamics(self, controlInterval, RK_steps, addGP = False, addOracle = False):
         DT = controlInterval/RK_steps
-        f = Function('f', [self.x, self.u], [self.getContinuousDynamics()])
+        f = Function('f', [self.x, self.u], [self.getContinuousDynamics(addOracle)])
         
         X0 = MX.sym('X0', 2)
         U = MX.sym('U', 1)
@@ -103,7 +109,7 @@ class cstrModel:
             X=X+DT/6*(k1 +2*k2 +2*k3 +k4)
         
         F = Function('F', [X0, U], [X],['x0', 'u'],['xf'])
-        if addGP and self.gpReady:
+        if addGP and self.gpReady and not addOracle:
             # x1Residual = 0 #self.gp_x1.getResidualFunction()
             x2Residual = self.gp_x2.getResidualFunction()
             XCOVAR0 = MX.sym('XCOVAR0', 4)

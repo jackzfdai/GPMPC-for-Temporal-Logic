@@ -98,6 +98,9 @@ class st_car_sim:
     def getSingleTrackStates(self):
         return self.stateVector[:5]
     
+    def getFullStateVector(self):
+        return self.stateVector
+    
     def func_ST(self, x, t, u, p):
         f = vehicle_dynamics_st(x, u, p)
         return f

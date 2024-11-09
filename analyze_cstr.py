@@ -31,7 +31,7 @@ bigMx2 = (cstr_x2lim[1] - cstr_x2lim[0]) + 1
 C_th = 0.1
 T_th = 0.5
 
-prstlEpsilon = 0.2
+prstlEpsilon = 0.01
 
 smoothOp_state_trace_file = open("./trace_data/cstr_30x30_state_traces_smoothOp.txt", "r")
 smoothOp_control_trace_file = open("./trace_data/cstr_30x30_control_traces_smoothOp.txt", "r")
@@ -42,6 +42,10 @@ GP_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_GP_eps"
 Nom_state_trace_file = open("./trace_data/cstr_30x30_state_traces_nom.txt", "r")
 Nom_control_trace_file = open("./trace_data/cstr_30x30_control_traces_nom.txt", "r")
 Nom_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_nom.txt", "r")
+
+oracle_smoothOp_state_trace_file = open("./trace_data/cstr_30x30_state_traces_oracle_smoothOp.txt", "r")
+oracle_smoothOp_control_trace_file = open("./trace_data/cstr_30x30_control_traces_oracle_smoothOp.txt", "r")
+oracle_smoothOp_solveTime_trace_file = open("./trace_data/cstr_30x30_solveTime_traces_oracle_smoothOp.txt", "r")
 
 def satLoop(stateTraceFile):
     stateTraceFile.seek(0)
@@ -129,7 +133,7 @@ def getTracesFor(init_x, init_y, stateTraceFile, controlTraceFile):
     
     return targetStateTraces, targetControlTraces
 
-def plotAllSol(N, stateTraceFileSmoothOp, controlTraceFileSmoothOp, stateTraceFileGP, controlTraceFileGP, stateTraceFileNom, controlTraceFileNom):
+def plotAllSol(N, stateTraceFileSmoothOp, controlTraceFileSmoothOp, stateTraceFileGP, controlTraceFileGP, stateTraceFileNom, controlTraceFileNom, stateTraceFileOracle, controlTraceFileOracle):
     initialStatesSmoothOp = getInitialStates(stateTraceFileSmoothOp)
     initialStatesGP = getInitialStates(stateTraceFileGP)
     initialStatesNom = getInitialStates(stateTraceFileNom)
@@ -137,7 +141,8 @@ def plotAllSol(N, stateTraceFileSmoothOp, controlTraceFileSmoothOp, stateTraceFi
         stateTracesSmoothOp, controlTracesSmoothOp = getTracesFor(initialState[0], initialState[1], stateTraceFileSmoothOp, controlTraceFileSmoothOp)
         stateTracesGP, controlTracesGP = getTracesFor(initialState[0], initialState[1], stateTraceFileGP, controlTraceFileGP)
         stateTracesNom, controlTracesNom = getTracesFor(initialState[0], initialState[1], stateTraceFileNom, controlTraceFileNom)
-        plotSol(N, stateTracesSmoothOp, controlTracesSmoothOp, stateTracesGP, controlTracesGP, stateTracesNom, controlTracesNom)
+        stateTracesOracle, controlTracesOracle = getTracesFor(initialState[0], initialState[1], stateTraceFileOracle, controlTraceFileOracle)
+        plotSol(N, stateTracesSmoothOp, controlTracesSmoothOp, stateTracesGP, controlTracesGP, stateTracesNom, controlTracesNom, stateTracesOracle, controlTracesOracle)
 
 def satList(stateTraceFile, controlTraceFile):
     initialStates = getInitialStates(stateTraceFile)
@@ -160,18 +165,20 @@ def satList(stateTraceFile, controlTraceFile):
 
     return sat_count_list
 
-def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [], u_Nom = []):
+def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [], u_Nom = [], x_Oracle = [], u_Oracle = []):
     params = {'mathtext.default': 'regular',
               'pdf.fonttype' : 42}          
     plt.rcParams.update(params)
     nom_plotIdx = 0
     smoothOp_plotIdx = 1
     GP_plotIdx = 2
-    fig, ax = plt.subplots(3, 3, constrained_layout=True)
+    oracle_plotIdx = 3
+    fig, ax = plt.subplots(3, 4, constrained_layout=True)
 
     nom_color = 'xkcd:amethyst'
     smoothOp_color = 'xkcd:windows blue'
     lri_color = 'xkcd:orangish'
+    oracle_color = 'xkcd:blue purple'
 
     controller_label_x = 0
     controller_label_y = 0.2
@@ -206,6 +213,14 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
     ax[0, nom_plotIdx].grid(True)
     ax[0, nom_plotIdx].text(controller_label_x, controller_label_y, 'Nominal', horizontalalignment='left', verticalalignment='bottom', fontsize="x-large")
 
+    ax[0, oracle_plotIdx].set_xlim(0, T)
+    ax[0, oracle_plotIdx].set_ylim(0, 0.2)
+    for traj in x_Oracle: 
+        tgrid_i = [T/N*k for k in range(traj.shape[0])]
+        ax[0, oracle_plotIdx].plot(tgrid_i, traj[:, 0], alpha=0.5, linestyle='-', linewidth=1, color=oracle_color)
+    ax[0, oracle_plotIdx].grid(True)
+    ax[0, oracle_plotIdx].text(controller_label_x, controller_label_y, 'Oracle', horizontalalignment='left', verticalalignment='bottom', fontsize="x-large")
+
     ax[1, smoothOp_plotIdx].set_xlim(0, T)
     ax[1, smoothOp_plotIdx].set_ylim(0, 1.2)
     ax[1, 0].set_ylabel('$Temperature, x_2$')
@@ -228,10 +243,17 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
         ax[1, nom_plotIdx].plot(tgrid_i, traj[:, 1], alpha=0.5, linestyle='-', linewidth=1, color=nom_color)
     ax[1, nom_plotIdx].grid(True)
 
+    ax[1, oracle_plotIdx].set_xlim(0, T)
+    ax[1, oracle_plotIdx].set_ylim(0, 1.2)
+    for traj in x_Oracle: 
+        tgrid_i = [T/N*k for k in range(traj.shape[0])]
+        ax[1, oracle_plotIdx].plot(tgrid_i, traj[:, 1], alpha=0.5, linestyle='-', linewidth=1, color=oracle_color)
+    ax[1, oracle_plotIdx].grid(True)
+
     ax[2, smoothOp_plotIdx].set_xlim(0, T)
     ax[2, smoothOp_plotIdx].set_ylim(-1.2, 1.2)
     ax[2, 0].set_ylabel('Cooling Input, u')
-    ax[2, 0].set_xlabel('T (mins)')
+    ax[2, smoothOp_plotIdx].set_xlabel('T (mins)')
     for traj in u_smoothOp: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]            
         ax[2, smoothOp_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color=smoothOp_color)
@@ -239,7 +261,7 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
 
     ax[2, GP_plotIdx].set_xlim(0, T)
     ax[2, GP_plotIdx].set_ylim(-1.2, 1.2)
-    ax[2, 1].set_xlabel('T (mins)')
+    ax[2, GP_plotIdx].set_xlabel('T (mins)')
     # ax[2, 1].set_yticklabels([])
     for traj in u_GP:
         tgrid_i = [T/N*k for k in range(traj.shape[0])]            
@@ -248,12 +270,21 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
 
     ax[2, nom_plotIdx].set_xlim(0, T)
     ax[2, nom_plotIdx].set_ylim(-1.2, 1.2)
-    ax[2, 2].set_xlabel('T (mins)')
+    ax[2, nom_plotIdx].set_xlabel('T (mins)')
     # ax[2, 2].set_yticklabels([])
     for traj in u_Nom: 
         tgrid_i = [T/N*k for k in range(traj.shape[0])]            
         ax[2, nom_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color=nom_color)
     ax[2, nom_plotIdx].grid(True)
+
+    ax[2, oracle_plotIdx].set_xlim(0, T)
+    ax[2, oracle_plotIdx].set_ylim(-1.2, 1.2)
+    ax[2, oracle_plotIdx].set_xlabel('T (mins)')
+    # ax[2, 2].set_yticklabels([])
+    for traj in u_Oracle: 
+        tgrid_i = [T/N*k for k in range(traj.shape[0])]            
+        ax[2, oracle_plotIdx].plot(tgrid_i, traj[:], '-', alpha=0.5, linewidth=1, color=oracle_color)
+    ax[2, oracle_plotIdx].grid(True)
 
 def checkSAT(N, stateTraj):
     SAT = False
@@ -340,14 +371,16 @@ def avgControlEffort(N, stateTraceFile, controlTraceFile):
         controlEffortList = np.vstack(controlEffortList)
         avgControlEffort = controlEffortList.mean()
         controlEffortStd = controlEffortList.std()
+        controlEffortQ75, controlEffortQ25 = np.percentile(controlEffortList, [75, 25])
+        controlEffortIQR = controlEffortQ75 - controlEffortQ25
         controlEffortQ95, controlEffortQ5 = np.percentile(controlEffortList, [95, 5])
-        controlEffortIQR = controlEffortQ95 - controlEffortQ5
 
-    return avgControlEffort, controlEffortStd, controlEffortIQR
+    return avgControlEffort, controlEffortStd, controlEffortIQR, controlEffortQ95, controlEffortQ5
 
 def timingStatsAll(timingTrace):
     timingAvg = -1
     timingStddev = 0
+    withinThresholdCount = 0
 
     timingTrace.seek(0)
 
@@ -356,53 +389,72 @@ def timingStatsAll(timingTrace):
         if line != "~\n":
             solveTime = float(line.split("\n")[0])
             solveTimes.append(solveTime)
+            if solveTime < T/N*60: 
+                withinThresholdCount += 1
 
     solveTimes = np.array(solveTimes)
     timingAvg = solveTimes.mean()
     timingStddev = solveTimes.std()
+    timingQ75, timingQ25 = np.percentile(solveTimes, [75, 25])
+    timingIQR = timingQ75 - timingQ25
     timingQ95, timingQ5 = np.percentile(solveTimes, [95, 5])
-    timingIQR = timingQ95 - timingQ5
+
+    if len(solveTimes) > 0:
+        withinThresholdPercent = withinThresholdCount/len(solveTimes)*100
+
     
-    return timingAvg, timingStddev, timingIQR
+    return timingAvg, timingStddev, timingIQR, withinThresholdPercent, timingQ95, timingQ5
 
-plotAllSol(N, smoothOp_state_trace_file, smoothOp_control_trace_file, GP_state_trace_file, GP_control_trace_file, Nom_state_trace_file, Nom_control_trace_file)
+plotAllSol(N, smoothOp_state_trace_file, smoothOp_control_trace_file, GP_state_trace_file, GP_control_trace_file, Nom_state_trace_file, Nom_control_trace_file, oracle_smoothOp_state_trace_file, oracle_smoothOp_control_trace_file)
+# plt.show()
 
-solveTimeAvgNom, solveTimeStdNom, solveTimeIqrNom = timingStatsAll(Nom_solveTime_trace_file)
-solveTimeAvgSmoothOp, solveTimeStdSmoothOp, solveTimeIqrSmoothOp = timingStatsAll(smoothOp_solveTime_trace_file)
-solveTimeAvgGP, solveTimeStdGP, solveTimeIqrGP = timingStatsAll(GP_solveTime_trace_file)
+solveTimeAvgNom, solveTimeStdNom, solveTimeIqrNom, withinIntervalPercentNom, solveTime95Nom, solveTime5Nom = timingStatsAll(Nom_solveTime_trace_file)
+solveTimeAvgSmoothOp, solveTimeStdSmoothOp, solveTimeIqrSmoothOp, withinIntervalPercentSmoothOp, solveTime95SmoothOp, solveTime5SmoothOp = timingStatsAll(smoothOp_solveTime_trace_file)
+solveTimeAvgGP, solveTimeStdGP, solveTimeIqrGP, withinIntervalPercentGP, solveTime95GP, solveTime5GP = timingStatsAll(GP_solveTime_trace_file)
+solveTimeAvgOracleSmoothOp, solveTimeStdOracleSmoothOp, solveTimeIqrOracleSmoothOp, withinIntervalPercentOracleSmoothOp, solveTime95OracleSmoothOp, solveTime5OracleSmoothOp = timingStatsAll(smoothOp_solveTime_trace_file)
 
 satCountNom = satLoop(Nom_state_trace_file)
 satCountGP = satLoop(GP_state_trace_file)
 satCountSmoothOp = satLoop(smoothOp_state_trace_file)
+satCountOracleSmoothOp = satLoop(oracle_smoothOp_state_trace_file)
 
 satListSmoothOp = satList(smoothOp_state_trace_file, smoothOp_control_trace_file)
 satListGP = satList(GP_state_trace_file, GP_control_trace_file)
 satListNom = satList(Nom_state_trace_file, Nom_control_trace_file)
+satListOracleSmoothOp = satList(oracle_smoothOp_state_trace_file, oracle_smoothOp_control_trace_file)
 
-avgControlEffortSmoothOp, controlEffortStdSmoothOp, controlEffortIqrSmoothOp = avgControlEffort(N, smoothOp_state_trace_file, smoothOp_control_trace_file)
-avgControlEffortGP, controlEffortStdGP, controlEffortIqrGP = avgControlEffort(N, GP_state_trace_file, GP_control_trace_file)
-avgControlEffortNom, controlEffortStdNom, controlEffortIqrNom = avgControlEffort(N, Nom_state_trace_file, Nom_control_trace_file)
+avgControlEffortSmoothOp, controlEffortStdSmoothOp, controlEffortIqrSmoothOp, controlEffort95SmoothOp, controlEffort5SmoothOp = avgControlEffort(N, smoothOp_state_trace_file, smoothOp_control_trace_file)
+avgControlEffortGP, controlEffortStdGP, controlEffortIqrGP, controlEffort95GP, controlEffort5GP = avgControlEffort(N, GP_state_trace_file, GP_control_trace_file)
+avgControlEffortNom, controlEffortStdNom, controlEffortIqrNom, controlEffort95Nom, controlEffort5Nom = avgControlEffort(N, Nom_state_trace_file, Nom_control_trace_file)
+avgControlEffortOracleSmoothOp, controlEffortStdOracleSmoothOp, controlEffortIqrOracleSmoothOp, controlEffort95OracleSmoothOp, controlEffort5OracleSmoothOp = avgControlEffort(N, oracle_smoothOp_state_trace_file, oracle_smoothOp_control_trace_file)
 
 print("--STL sat--")
 print("Smooth Op: ", str(satCountSmoothOp))
+print("Smooth Op (oracle): ", str(satCountOracleSmoothOp))
 print("LRi (GP): ", str(satCountGP))
 print("Nom: ", str(satCountNom))
 print("---STL sat list---")
 print("Smooth Op: ", str(satListSmoothOp))
+print("Smooth Op (oracle): ", str(satListOracleSmoothOp))
 print("LRi (GP): ", str(satListGP))
 print("Nom: ", str(satListNom))
 print("--_Control effort--_")
-print("Smooth Op Avg: ", str(avgControlEffortSmoothOp), " Std: ", str(controlEffortStdSmoothOp), " IQR: ", str(controlEffortIqrSmoothOp))
-print("LRi (GP) Avg: ", str(avgControlEffortGP), " Std: ", str(controlEffortStdGP), " IQR: ", str(controlEffortIqrGP))
-print("Nom Avg: ", str(avgControlEffortNom), " Std: ", str(controlEffortStdNom), " IQR: ", str(controlEffortIqrNom))
+print("Smooth Op Avg: ", str(avgControlEffortSmoothOp), " Std: ", str(controlEffortStdSmoothOp), " IQR: ", str(controlEffortIqrSmoothOp), " 95: ", str(controlEffort95SmoothOp), " 5: ", str(controlEffort5SmoothOp))
+print("Smooth Op (oracle) Avg: ", str(avgControlEffortOracleSmoothOp), " Std: ", str(controlEffortStdOracleSmoothOp), " IQR: ", str(controlEffortIqrOracleSmoothOp), " 95: ", str(controlEffort95OracleSmoothOp), " 5: ", str(controlEffort5OracleSmoothOp))
+print("LRi (GP) Avg: ", str(avgControlEffortGP), " Std: ", str(controlEffortStdGP), " IQR: ", str(controlEffortIqrGP), " 95: ", str(controlEffort95GP), " 5: ", str(controlEffort5GP))
+print("Nom Avg: ", str(avgControlEffortNom), " Std: ", str(controlEffortStdNom), " IQR: ", str(controlEffortIqrNom), " 95: ", str(controlEffort95Nom), " 5: ", str(controlEffort5Nom))
 print("---Solve Time---")
-print("Smooth Op Avg: ", str(solveTimeAvgSmoothOp), " Std: ", str(solveTimeStdSmoothOp), " IQR: ", str(solveTimeIqrSmoothOp))
-print("LRi (GP) Avg: ", str(solveTimeAvgGP), " Std: ", str(solveTimeStdGP), " IQR: ", str(solveTimeIqrGP))
-print("Nom Avg: ", str(solveTimeAvgNom), " Std: ", str(solveTimeStdNom), " IQR: ", str(solveTimeIqrNom))
+print("Smooth Op Avg: ", str(solveTimeAvgSmoothOp), " Std: ", str(solveTimeStdSmoothOp), " IQR: ", str(solveTimeIqrSmoothOp), " WithinThreshold: ", str(withinIntervalPercentSmoothOp), " 95: ", str(solveTime95SmoothOp), " 5: ", str(solveTime5SmoothOp))
+print("Smooth Op (oracle) Avg: ", str(solveTimeAvgOracleSmoothOp), " Std: ", str(solveTimeStdOracleSmoothOp), " IQR: ", str(solveTimeIqrOracleSmoothOp), " WithinThreshold: ", withinIntervalPercentOracleSmoothOp, " 95: ", str(solveTime95OracleSmoothOp), " 5: ", str(solveTime5OracleSmoothOp))
+print("LRi (GP) Avg: ", str(solveTimeAvgGP), " Std: ", str(solveTimeStdGP), " IQR: ", str(solveTimeIqrGP), " WithinThreshold: ", str(withinIntervalPercentGP), " 95: ", str(solveTime95GP), " 5: ", str(solveTime5GP))
+print("Nom Avg: ", str(solveTimeAvgNom), " Std: ", str(solveTimeStdNom), " IQR: ", str(solveTimeIqrNom), " WithinThreshold: ", str(withinIntervalPercentNom), " 95: ", str(solveTime95Nom), " 5: ", str(solveTime5Nom))
 
 smoothOp_state_trace_file.close()
 smoothOp_control_trace_file.close()
 smoothOp_solveTime_trace_file.close()
+oracle_smoothOp_state_trace_file.close()
+oracle_smoothOp_control_trace_file.close()
+oracle_smoothOp_solveTime_trace_file.close()
 GP_state_trace_file.close()
 GP_control_trace_file.close()
 GP_solveTime_trace_file.close()

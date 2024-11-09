@@ -3,7 +3,7 @@ from casadi import *
 
 import gp_dynamics as gpdyn
 
-class singleTrackCarModel:
+class kinematicSingleTrackCarModel:
     def __init__(self, lwb, params): #, x0, y0, v0, carAng0
         self.lwb = lwb
         self.params = params 
@@ -293,3 +293,97 @@ class singleTrackCarModel:
     def resetLTVstatus(self):
         self.ltvReadyNom = False
         self.ltvReadyGP = False
+
+class singleTrackCarModel: #used as sim model, implemented as control model here to use as oracle
+    def __init__(self, lwb, params): #, x0, y0, v0, carAng0
+        self.lwb = lwb
+        self.params = params 
+        self.x = SX.sym('x', 7) #[x, y, steerAng, v, carAng]
+        self.u = SX.sym('u', 2) #[vSteerAng, accel]
+        self.xlim = [0, 0]
+        self.ylim = [0, 0]
+        self.steerAnglim = [0, 0]
+        #self.deltaCovarLim
+        self.vlim = [0, 0]
+        self.carAngLim = [0, 0]
+        self.dotCarAngLim = [0, 0]
+        self.slipAngLim = [0, 0]
+        self.vSteerAngLim = [0, 0]
+        self.accelLim = [0, 0]
+
+    def setLimits(self, xlim, ylim, steerAngLim, vlim, carAngLim, dotCarAngLim, slipAngLim, vSteerAngLim, accelLim):
+        self.xlim = xlim
+        self.ylim = ylim
+        self.steerAngLim = steerAngLim
+        self.vlim = vlim
+        self.carAngLim = carAngLim
+        self.dotCarAngLim = dotCarAngLim
+        self.slipAngLim = slipAngLim
+        self.vSteerAngLim = vSteerAngLim
+        self.accelLim = accelLim
+
+    def getStateLimits(self):
+        return self.xlim, self.ylim, self.steerAngLim, self.vlim, self.carAngLim, self.dotCarAngLim, self.slipAngLim
+    
+    def getInputLimits(self):
+        return self.vSteerAngLim, self.accelLim
+    
+    def getStateVar(self):
+        return self.x
+    
+    def getInputVar(self):
+        return self.u
+    
+    def getSwitchingVelocity(self):
+        return self.params.longitudinal.v_switch
+    
+    def getContinuousDynamics(self, useDisturbance):
+        # set gravity constant
+        g = 9.81  # [m/s^2]
+
+        # create equivalent bicycle parameters    
+        mu = self.params.tire.p_dy1
+        if useDisturbance:
+            mu = self.params.tire.p_dy1*0.85 + self.params.tire.p_dy1*0.15*(sin(2*pi/3*(self.x[1] - 3/4) - 1))
+        C_Sf = -self.params.tire.p_ky1 / self.params.tire.p_dy1
+        C_Sr = -self.params.tire.p_ky1 / self.params.tire.p_dy1
+        lf = self.params.a
+        lr = self.params.b
+        h = self.params.h_s
+        m = self.params.m
+        I = self.params.I_z
+
+        # system dynamics
+        xdot = vertcat(self.x[3] * cos(self.x[6] + self.x[4]),
+                       self.x[3] * sin(self.x[6] + self.x[4]),
+                       self.u[0],
+                       self.u[1],
+                       self.x[5],
+                       -mu * m / (self.x[3] * I * (lr + lf)) * (
+                        lf ** 2 * C_Sf * (g * lr - self.u[1] * h) + lr ** 2 * C_Sr * (g * lf + self.u[1] * h)) * self.x[5] \
+                        + mu * m / (I * (lr + lf)) * (lr * C_Sr * (g * lf + self.u[1] * h) - lf * C_Sf * (g * lr - self.u[1] * h)) * self.x[6] \
+                        + mu * m / (I * (lr + lf)) * lf * C_Sf * (g * lr - self.u[1] * h) * self.x[2],
+                        (mu / (self.x[3] ** 2 * (lr + lf)) * (C_Sr * (g * lf + self.u[1] * h) * lr - C_Sf * (g * lr - self.u[1] * h) * lf) - 1) *
+                        self.x[5] \
+                        - mu / (self.x[3] * (lr + lf)) * (C_Sr * (g * lf + self.u[1] * h) + C_Sf * (g * lr - self.u[1] * h)) * self.x[6] \
+                        + mu / (self.x[3] * (lr + lf)) * (C_Sf * (g * lr - self.u[1] * h)) * self.x[2])
+        
+        return xdot
+    
+    def getDiscreteDynamics(self, controlInterval, RK_steps):
+        DT = controlInterval/RK_steps
+        f = Function('f', [self.x, self.u], [self.getContinuousDynamics(True)]) 
+        
+        X0 = MX.sym('X0', 7)
+        U = MX.sym('U', 2)
+        X = X0
+        for j in range(RK_steps):
+            k1 = f(X, U)
+            k2 = f(X + DT/2 * k1, U)
+            k3 = f(X + DT/2 * k2, U)
+            k4 = f(X + DT * k3, U)
+            X=X+DT/6*(k1 +2*k2 +2*k3 +k4)
+        
+        F = Function('F', [X0, U], [X],['x0', 'u'],['xf'])
+
+        return F

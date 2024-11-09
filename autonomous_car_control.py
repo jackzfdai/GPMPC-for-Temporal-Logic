@@ -83,8 +83,15 @@ carAngCovarLim = [0, 100]
 vSteerAngLim = [-0.39, 0.39]
 accelLim = [-11.4, 11.4]
 
-car_sys = stcar.singleTrackCarModel(lwb = carlf + carlr, params = p)
+car_sys = stcar.kinematicSingleTrackCarModel(lwb = carlf + carlr, params = p)
 car_sys.setLimits(xlim, ylim, steerAngLim, vlim, carAngLim, vSteerAngLim, accelLim)
+
+#---oracle---#
+car_sys_oracle = stcar.singleTrackCarModel(lwb = carlf + carlr, params = p)
+dotCarAngLim = [-math.pi, math.pi]
+slipAngLim = [-0.49*math.pi, 0.49*math.pi]
+car_sys_oracle.setLimits(xlim, ylim, steerAngLim, vlim, carAngLim, dotCarAngLim, slipAngLim, vSteerAngLim, accelLim)
+#---end oracle---#
 
 car_sim = st_car_sim(sx0, sy0, steerAng0, vel0, Psi0)
 
@@ -263,7 +270,7 @@ def solveSetpointControl(plot, T, N, car, x0, y0, steerAng0, v0, carAng0, xN, yN
 
     return proc_runtime, feasible, state_opt, control_opt
 
-def solveSmoothedRobustnessNLP(plot, controlCost, T, N, car, x0, y0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y):
+def solveSmoothedRobustnessNLP(plot, controlCost, T, N, car, x0, y0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y, oracle = False, dotCarAng0 = 0, slipAng0 = 0):
     feasible = False
 
     # Declare model variables
@@ -273,23 +280,46 @@ def solveSmoothedRobustnessNLP(plot, controlCost, T, N, car, x0, y0, steerAng0, 
     stateLen = x.size()[0]
     controlLen = u.size()[0]
 
-    xlim, ylim, steerAngLim, vlim, carAngLim = car.getStateLimits()
+    xlim = []
+    ylim = []
+    steerAngLim = []
+    vlim = []
+    carAngLim = []
+    dotCarAngLim = []
+    slipAngLim = []
+    if oracle == True:
+        xlim, ylim, steerAngLim, vlim, carAngLim, dotCarAngLim, slipAngLim = car.getStateLimits()
+    else:
+        xlim, ylim, steerAngLim, vlim, carAngLim = car.getStateLimits()
+
     vSteerAngLim, aLim = car.getInputLimits()
 
-    lbx = [xlim[0], ylim[0], steerAngLim[0], vlim[0], carAngLim[0]]
-    ubx = [xlim[1], ylim[1], steerAngLim[1], vlim[1], carAngLim[1]]
+    lbx = []
+    ubx = []
+    if oracle == True:
+        lbx = [xlim[0], ylim[0], steerAngLim[0], vlim[0], carAngLim[0], dotCarAngLim[0], slipAngLim[0]]
+        ubx = [xlim[1], ylim[1], steerAngLim[1], vlim[1], carAngLim[1], dotCarAngLim[1], slipAngLim[1]]
+    else:
+        lbx = [xlim[0], ylim[0], steerAngLim[0], vlim[0], carAngLim[0]]
+        ubx = [xlim[1], ylim[1], steerAngLim[1], vlim[1], carAngLim[1]]
 
     lbu = [vSteerAngLim[0], aLim[0]]
     ubu = [vSteerAngLim[1], aLim[1]]
 
     x_init = [x0, y0, steerAng0, v0, carAng0]
+    if oracle == True:
+        x_init = [x0, y0, steerAng0, v0, carAng0, dotCarAng0, slipAng0]
 
     v_switch = car.getSwitchingVelocity()
 
     M = 4 # RK4 steps per interval
 
     # Model equations
-    car_dynamics = car.getDiscreteDynamics(T/N, M, False)
+    car_dynamics = 0
+    if oracle == True:
+        car_dynamics = car.getDiscreteDynamics(T/N, M)
+    else:
+        car_dynamics = car.getDiscreteDynamics(T/N, M, False)
 
     # Objective term
     L = 0 
@@ -395,6 +425,12 @@ def solveSmoothedRobustnessNLP(plot, controlCost, T, N, car, x0, y0, steerAng0, 
         
         lbg += [0]
         ubg += [ubu[1] - lbu[1]]
+
+        # if oracle == True:
+        #     g += [sqrt(Uk[1]**2 + (Xk[3]*Xk[5])**2)]
+        
+        #     lbg += [0]
+        #     ubg += [ubu[1]]
 
         # Integrate till the end of the interval
         Fk = car_dynamics(x0=Xk, u=Uk)
@@ -510,10 +546,16 @@ def solveSmoothedRobustnessNLP(plot, controlCost, T, N, car, x0, y0, steerAng0, 
         steerAng_opt = w1_opt[0:numVarPerTimeStep*(N)+stateLen][2::numVarPerTimeStep]
         v_opt = w1_opt[0:numVarPerTimeStep*(N)+stateLen][3::numVarPerTimeStep]
         carAng_opt = w1_opt[0:numVarPerTimeStep*(N)+stateLen][4::numVarPerTimeStep]
+        if oracle == True:
+            dotCarAng_opt = w1_opt[0:numVarPerTimeStep*(N)+stateLen][5::numVarPerTimeStep]
+            slipAng_opt = w1_opt[0:numVarPerTimeStep*(N)+stateLen][6::numVarPerTimeStep]
         vSteerAng_opt = w1_opt[0:numVarPerTimeStep*(N)+stateLen][numVarPerTimeStep-2::numVarPerTimeStep] 
         accel_opt = w1_opt[0:numVarPerTimeStep*(N)+stateLen][numVarPerTimeStep-1::numVarPerTimeStep]
 
-        state_opt = np.concatenate([[x_opt], [y_opt], [steerAng_opt], [v_opt], [carAng_opt]], axis=0)
+        if oracle == True:
+            state_opt = np.concatenate([[x_opt], [y_opt], [steerAng_opt], [v_opt], [carAng_opt], [dotCarAng_opt], [slipAng_opt]], axis=0)
+        else:
+            state_opt = np.concatenate([[x_opt], [y_opt], [steerAng_opt], [v_opt], [carAng_opt]], axis=0)
         # print(np.transpose(state_opt))
         control_opt = np.concatenate([[vSteerAng_opt], [accel_opt]], axis=0)
         # print(np.transpose(control_opt))
@@ -1446,12 +1488,15 @@ def controlLoopSetpoint(plot, T, N, simRes, car_control_model, car_sim_model, x0
 
     return closedLoopControlTraj, closedLoopStates
 
-def controlLoop(plot, controlCost, writeTraces, T, N, simRes, car_control_model, car_sim_model, x0, y0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y, stateTrajFile = [], controlTrajFile = [], solveTimeFile = []):
+def controlLoop(plot, controlCost, writeTraces, T, N, simRes, car_control_model, car_sim_model, x0, y0, steerAng0, v0, carAng0, goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y, stateTrajFile = [], controlTrajFile = [], solveTimeFile = [], oracle = False):
     dT = T/N
 
     car_sim_model.setInitialState(x0, y0, steerAng0, v0, carAng0)
 
     stateVector = np.array([x0, y0, steerAng0, v0, carAng0])
+    if oracle == True:
+        stateVector = car_sim_model.getFullStateVector()
+
     closedLoopStates = [stateVector]
     sx_openloops = []
     sy_openloops = []
@@ -1473,7 +1518,10 @@ def controlLoop(plot, controlCost, writeTraces, T, N, simRes, car_control_model,
             print("Starting state infeasible. Exiting")
             break
 
-        solveTime, feasible, stateTraj, controlTraj = solveSmoothedRobustnessNLP(False, controlCost, T-i*(T/N), N-i, car_control_model, stateVector[0], stateVector[1], stateVector[2], stateVector[3], stateVector[4], goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y)
+        if oracle == True:
+            solveTime, feasible, stateTraj, controlTraj = solveSmoothedRobustnessNLP(False, controlCost, T-i*(T/N), N-i, car_control_model, stateVector[0], stateVector[1], stateVector[2], stateVector[3], stateVector[4], goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y, oracle = True, dotCarAng0=stateVector[5], slipAng0=stateVector[6])
+        else:
+            solveTime, feasible, stateTraj, controlTraj = solveSmoothedRobustnessNLP(False, controlCost, T-i*(T/N), N-i, car_control_model, stateVector[0], stateVector[1], stateVector[2], stateVector[3], stateVector[4], goal_A_polygon_x, goal_A_polygon_y, obstacle_polygon_x, obstacle_polygon_y)
 
         numIters += 1
         totalSolveTime += solveTime
@@ -1502,7 +1550,10 @@ def controlLoop(plot, controlCost, writeTraces, T, N, simRes, car_control_model,
         print("Predicted next state: ")
         print(stateTraj[:, 1])
 
-        nextStateVector = car_sim_model.getSingleTrackStates()
+        if oracle == True:
+            nextStateVector = car_sim_model.getFullStateVector()
+        else:
+            nextStateVector = car_sim_model.getSingleTrackStates()
         print("Simulated next state" )
         print(nextStateVector)
 
@@ -1646,11 +1697,14 @@ car_GP_v_file.close()
 car_GP_carAng_file.close()
 #-----end GP load from file----#
 
-def testLoop(numRuns, stateTrace, controlTrace, solveTimeTrace, start_x, start_y, goal_x, goal_y, obstacle_x, obstacle_y):    
+def testLoop(numRuns, stateTrace, controlTrace, solveTimeTrace, start_x, start_y, goal_x, goal_y, obstacle_x, obstacle_y, oracle = False):    
     totalSolveTimeLoopSmooth = 0
     numItersLoopSmooth = 0
+    car = car_sys
+    if oracle == True:
+        car = car_sys_oracle
     for i in range(numRuns):
-        avgSolveTime, maxSolveTime, totalSolvetime, numIters, feasible, _, _, stateTraj = controlLoop(False, False, True, T, N, simulation_resolution, car_sys, car_sim, start_x, start_y, steerAng0, vel0, Psi0, goal_x, goal_y, obstacle_x, obstacle_y, stateTrace, controlTrace, solveTimeTrace)
+        avgSolveTime, maxSolveTime, totalSolvetime, numIters, feasible, _, _, stateTraj = controlLoop(False, False, True, T, N, simulation_resolution, car, car_sim, start_x, start_y, steerAng0, vel0, Psi0, goal_x, goal_y, obstacle_x, obstacle_y, stateTrace, controlTrace, solveTimeTrace, oracle=oracle)
         totalSolveTimeLoopSmooth += totalSolvetime
         numItersLoopSmooth += numIters
 
@@ -1711,6 +1765,9 @@ maxTimeNomLTVList = []
 avgTimeSmoothList = []
 maxTimeSmoothList = []
 
+avgTimeOracleSmoothList = []
+maxTimeOracleSmoothList = []
+
 avgTimeLTVList = []
 maxTimeLTVList = []
 
@@ -1732,58 +1789,81 @@ smallObstacleRho = 0.25 #Since system is treated as discrete, even though discre
 
 prstlEpsilon = 0.3
 
-# smoothOp_state_trace = open("./trace_data/autocar_state_traces_smoothOp.txt", "w")
-# smoothOp_control_trace = open("./trace_data/autocar_control_traces_smoothOp.txt", "w")
-# smoothOp_solveTime_trace = open("./trace_data/autocar_solveTime_traces_smoothOp.txt", "w")
-# LTVGP_state_trace = open("./trace_data/autocar_state_trace_LTVGP.txt", "w")
-# LTVGP_control_trace = open("./trace_data/autocar_control_trace_LTVGP.txt", "w")
-# LTVGP_solveTime_trace = open("./trace_data/autocar_solveTime_traces_LTVGP.txt", "w")
+smoothOp_state_trace = open("./trace_data/autocar_state_traces_smoothOp.txt", "w")
+smoothOp_control_trace = open("./trace_data/autocar_control_traces_smoothOp.txt", "w")
+smoothOp_solveTime_trace = open("./trace_data/autocar_solveTime_traces_smoothOp.txt", "w")
+oracle_smoothOp_state_trace = open("./trace_data/autocar_state_traces_oracle_smoothOp.txt", "w")
+oracle_smoothOp_control_trace = open("./trace_data/autocar_control_traces_oracle_smoothOp.txt", "w")
+oracle_smoothOp_solveTime_trace = open("./trace_data/autocar_solveTime_traces_oracle_smoothOp.txt", "w")
+LTVGP_state_trace = open("./trace_data/autocar_state_trace_LTVGP.txt", "w")
+LTVGP_control_trace = open("./trace_data/autocar_control_trace_LTVGP.txt", "w")
+LTVGP_solveTime_trace = open("./trace_data/autocar_solveTime_traces_LTVGP.txt", "w")
 LTVGP_state_trace_offlineCovar = open("./trace_data/autocar_state_trace_LTVGP_offlineCovar_eps"+str(prstlEpsilon)+".txt", "w")
 LTVGP_control_trace_offlineCovar = open("./trace_data/autocar_control_trace_LTVGP_offlineCovar_eps"+str(prstlEpsilon)+".txt", "w")
 LTVGP_solveTime_trace_offlineCovar = open("./trace_data/autocar_solveTime_traces_LTVGP_offlineCovar_eps"+str(prstlEpsilon)+".txt", "w")
-# nom_state_trace = open("./trace_data/autocar_state_trace_nom.txt", "w")
-# nom_control_trace = open("./trace_data/autocar_control_trace_nom.txt", "w")
-# nom_solveTime_trace = open("./trace_data/autocar_solveTime_traces_nom.txt", "w")
+nom_state_trace = open("./trace_data/autocar_state_trace_nom.txt", "w")
+nom_control_trace = open("./trace_data/autocar_control_trace_nom.txt", "w")
+nom_solveTime_trace = open("./trace_data/autocar_solveTime_traces_nom.txt", "w")
 
 totalTimeNomLTV = 0
 totalNumItersNomLTV = 0
-# for config in configs:
-#     goal_x = [config, 100]
-#     goal_y = [0, 3] 
-#     obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
-#     obstacle_y = [0, 3 + smallObstacleRho]
-#     for i in range(numStartPositions):
-#         x_init = start_x[i]
-#         y_init = start_y[i]
+for config in configs:
+    goal_x = [config, 100]
+    goal_y = [0, 3] 
+    obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
+    obstacle_y = [0, 3 + smallObstacleRho]
+    for i in range(numStartPositions):
+        x_init = start_x[i]
+        y_init = start_y[i]
 
-#         avgTimeNomLTV, maxTimeNomLTV, oneLoopTotalTimeNomLTV, oneLoopNumItersNomLTV = testLoopNomLTV(numberTrials, nom_state_trace, nom_control_trace, nom_solveTime_trace, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
+        avgTimeNomLTV, maxTimeNomLTV, oneLoopTotalTimeNomLTV, oneLoopNumItersNomLTV = testLoopNomLTV(numberTrials, nom_state_trace, nom_control_trace, nom_solveTime_trace, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
 
-#         totalTimeNomLTV += oneLoopTotalTimeNomLTV 
-#         totalNumItersNomLTV += oneLoopNumItersNomLTV
+        totalTimeNomLTV += oneLoopTotalTimeNomLTV 
+        totalNumItersNomLTV += oneLoopNumItersNomLTV
 
-#         avgTimeNomLTVList += [avgTimeNomLTV]
-#         maxTimeNomLTVList += [maxTimeNomLTV]
+        avgTimeNomLTVList += [avgTimeNomLTV]
+        maxTimeNomLTVList += [maxTimeNomLTV]
 
 
 totalTimeSmooth = 0
 totalNumItersSmooth = 0
-# for config in configs:
-#     goal_x = [config, 100]
-#     goal_y = [0, 3] 
-#     obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
-#     obstacle_y = [0, 3 + smallObstacleRho]
+for config in configs:
+    goal_x = [config, 100]
+    goal_y = [0, 3] 
+    obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
+    obstacle_y = [0, 3 + smallObstacleRho]
 
-#     for i in range(numStartPositions):
-#         x_init = start_x[i]
-#         y_init = start_y[i]
+    for i in range(numStartPositions):
+        x_init = start_x[i]
+        y_init = start_y[i]
 
-#         avgTimeSmooth, maxTimeSmooth, oneLoopSolveTime, oneLoopNumIters = testLoop(numberTrials, smoothOp_state_trace, smoothOp_control_trace, smoothOp_solveTime_trace, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
+        avgTimeSmooth, maxTimeSmooth, oneLoopSolveTime, oneLoopNumIters = testLoop(numberTrials, smoothOp_state_trace, smoothOp_control_trace, smoothOp_solveTime_trace, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y)
 
-#         totalTimeSmooth += oneLoopSolveTime
-#         totalNumItersSmooth += oneLoopNumIters
+        totalTimeSmooth += oneLoopSolveTime
+        totalNumItersSmooth += oneLoopNumIters
 
-#         avgTimeSmoothList += [avgTimeSmooth]
-#         maxTimeSmoothList += [maxTimeSmooth]
+        avgTimeSmoothList += [avgTimeSmooth]
+        maxTimeSmoothList += [maxTimeSmooth]
+
+totalTimeOracleSmooth = 0
+totalNumItersOracleSmooth = 0
+for config in configs:
+    goal_x = [config, 100]
+    goal_y = [0, 3] 
+    obstacle_x = [20 - smallObstacleRho, config + smallObstacleRho]
+    obstacle_y = [0, 3 + smallObstacleRho]
+
+    for i in range(numStartPositions):
+        x_init = start_x[i]
+        y_init = start_y[i]
+
+        avgTimeOracleSmooth, maxTimeOracleSmooth, oneLoopSolveTimeOracle, oneLoopNumItersOracle = testLoop(numberTrials, oracle_smoothOp_state_trace, oracle_smoothOp_control_trace, oracle_smoothOp_solveTime_trace, x_init, y_init, goal_x, goal_y, obstacle_x, obstacle_y, oracle = True)
+
+        totalTimeOracleSmooth += oneLoopSolveTimeOracle
+        totalNumItersOracleSmooth += oneLoopNumItersOracle
+
+        avgTimeOracleSmoothList += [avgTimeOracleSmooth]
+        maxTimeOracleSmoothList += [maxTimeOracleSmooth]
 
 # totalTimeLTV = 0
 # totalNumItersLTV = 0
@@ -1833,6 +1913,10 @@ totalAvgTimeSmooth = -1
 if totalNumItersSmooth > 0:
     totalAvgTimeSmooth = totalTimeSmooth/totalNumItersSmooth
 
+totalAvgTimeOracleSmooth = -1 
+if totalNumItersOracleSmooth > 0:
+    totalAvgTimeOracleSmooth = totalTimeOracleSmooth/totalNumItersOracleSmooth
+
 # totalAvgTimeLTV = -1
 # if totalNumItersLTV > 0: 
 #     totalAvgTimeLTV = totalTimeLTV/totalNumItersLTV
@@ -1844,12 +1928,14 @@ if totalNumItersLTV_offlineCovar > 0:
 print("-----Avg time stat-----")
 print("Avg time Nom: ", totalAvgTimeNomLTV)
 print("Avg time smooth: ", totalAvgTimeSmooth)
+print("Avg time smooth (oracle): ", totalAvgTimeOracleSmooth)
 # print("Avg time LTV: ", totalAvgTimeLTV)
 print("Avg time LTV offline covar: ", totalAvgTimeLTVofflineCovar)
 
 print("-----num Iters debug-----")
 print("num iters Nom: ", totalNumItersNomLTV)
 print("num iters smooth: ", totalNumItersSmooth)
+print("num iters smooth (oracle): ", totalNumItersOracleSmooth)
 # print("num iters LTV: ", totalNumItersLTV)
 print("num iters LTV offline covar: ", totalNumItersLTV_offlineCovar)
 
@@ -1857,20 +1943,24 @@ print("num iters LTV offline covar: ", totalNumItersLTV_offlineCovar)
 print("-----Max time stat-----")
 print("Max time Nom: ", maxTimeNomLTVList)
 print("Max time smooth: ", maxTimeSmoothList)
+print("Max time smooth (oracle): ", maxTimeOracleSmoothList)
 # print("Max time LTV: ", maxTimeLTVList)
 print("Max time LTV offline covar: ", maxTimeLTVList_offlineCovar)
 
-# smoothOp_state_trace.close()
-# smoothOp_control_trace.close()
-# smoothOp_solveTime_trace.close()
-# LTVGP_state_trace.close()
-# LTVGP_control_trace.close()
-# LTVGP_solveTime_trace.close()
+smoothOp_state_trace.close()
+smoothOp_control_trace.close()
+smoothOp_solveTime_trace.close()
+oracle_smoothOp_state_trace.close()
+oracle_smoothOp_control_trace.close()
+oracle_smoothOp_solveTime_trace.close()
+LTVGP_state_trace.close()
+LTVGP_control_trace.close()
+LTVGP_solveTime_trace.close()
 LTVGP_state_trace_offlineCovar.close()
 LTVGP_control_trace_offlineCovar.close()
 LTVGP_solveTime_trace_offlineCovar.close()
-# nom_state_trace.close()
-# nom_control_trace.close()
-# nom_solveTime_trace.close()
+nom_state_trace.close()
+nom_control_trace.close()
+nom_solveTime_trace.close()
 
 plt.show()
