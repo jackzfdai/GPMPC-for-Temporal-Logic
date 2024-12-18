@@ -203,7 +203,7 @@ def plotSol(N, x_smoothOp = [], u_smoothOp = [], x_GP = [], u_GP = [], x_Nom = [
         tgrid_i = [T/N*k for k in range(traj.shape[0])]
         ax[0, GP_plotIdx].plot(tgrid_i, traj[:, 0], alpha=0.5, linestyle='-', linewidth=1, color=lri_color)
     ax[0, GP_plotIdx].grid(True)
-    ax[0, GP_plotIdx].text(controller_label_x, controller_label_y, 'LRi', horizontalalignment='left', verticalalignment='bottom', fontsize="x-large")
+    ax[0, GP_plotIdx].text(controller_label_x, controller_label_y, 'LRi ($\epsilon_{' + str(prstlEpsilon) + '0}$)', horizontalalignment='left', verticalalignment='bottom', fontsize="x-large")
 
     ax[0, nom_plotIdx].set_xlim(0, T)
     ax[0, nom_plotIdx].set_ylim(0, 0.2)
@@ -411,7 +411,7 @@ plotAllSol(N, smoothOp_state_trace_file, smoothOp_control_trace_file, GP_state_t
 solveTimeAvgNom, solveTimeStdNom, solveTimeIqrNom, withinIntervalPercentNom, solveTime95Nom, solveTime5Nom = timingStatsAll(Nom_solveTime_trace_file)
 solveTimeAvgSmoothOp, solveTimeStdSmoothOp, solveTimeIqrSmoothOp, withinIntervalPercentSmoothOp, solveTime95SmoothOp, solveTime5SmoothOp = timingStatsAll(smoothOp_solveTime_trace_file)
 solveTimeAvgGP, solveTimeStdGP, solveTimeIqrGP, withinIntervalPercentGP, solveTime95GP, solveTime5GP = timingStatsAll(GP_solveTime_trace_file)
-solveTimeAvgOracleSmoothOp, solveTimeStdOracleSmoothOp, solveTimeIqrOracleSmoothOp, withinIntervalPercentOracleSmoothOp, solveTime95OracleSmoothOp, solveTime5OracleSmoothOp = timingStatsAll(smoothOp_solveTime_trace_file)
+solveTimeAvgOracleSmoothOp, solveTimeStdOracleSmoothOp, solveTimeIqrOracleSmoothOp, withinIntervalPercentOracleSmoothOp, solveTime95OracleSmoothOp, solveTime5OracleSmoothOp = timingStatsAll(oracle_smoothOp_solveTime_trace_file)
 
 satCountNom = satLoop(Nom_state_trace_file)
 satCountGP = satLoop(GP_state_trace_file)

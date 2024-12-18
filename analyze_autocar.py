@@ -323,7 +323,7 @@ def plotSol1(N, plotControl, x_smoothOp = [], u_smoothOp = [], x_GP_offlineCovar
     ax[GP_offlineCovar_plotIdx].set_ylim(ylim[0], ylim[1])
     ax[GP_offlineCovar_plotIdx].set_xlabel('$s_x\, (m)$')
     ax[GP_offlineCovar_plotIdx].set_ylabel('$s_y\, (m)$')
-    ax[GP_offlineCovar_plotIdx].text(controller_label_x, controller_label_y, 'LRi-A', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
+    ax[GP_offlineCovar_plotIdx].text(controller_label_x, controller_label_y, 'LRi-A ($\epsilon_{' + str(prstlEpsilon) + '}$)', horizontalalignment='right', verticalalignment='center', fontsize="x-large")
 
     for traj in x_GP_offlineCovar:
         ax[GP_offlineCovar_plotIdx].plot(traj[:,0], traj[:,1], linestyle='-', linewidth=1, color=lri_color)
